@@ -21,30 +21,44 @@
   }
   * { box-sizing: border-box; }
   body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--txt); }
-  header { position: sticky; top: 0; z-index: 5; background: var(--acc); color: #fff; padding: 12px 16px calc(10px); }
+  header { position: sticky; top: 0; z-index: 5; background: var(--acc); color: #fff; padding: 12px 16px 10px; }
   @media (prefers-color-scheme: dark) { header { background: #16304a; } }
   header h1 { margin: 0; font-size: 19px; }
   header .sub { font-size: 12.5px; opacity: .85; margin-top: 2px; }
   main { max-width: 860px; margin: 0 auto; padding: 12px; }
   .search { width: 100%; padding: 11px 14px; font-size: 16px; border-radius: var(--r); border: 1px solid var(--line); background: var(--card); color: var(--txt); }
+  .hint { font-size: 12.5px; color: var(--muted); margin: 5px 4px 0; }
   details.filtri { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); margin: 10px 0; }
   details.filtri > summary { cursor: pointer; padding: 11px 14px; font-weight: 600; list-style: none; display: flex; justify-content: space-between; }
   details.filtri > summary::-webkit-details-marker { display: none; }
   details.filtri > summary::after { content: "▾"; color: var(--muted); }
   details.filtri[open] > summary::after { content: "▴"; }
   .fbody { padding: 0 14px 12px; }
-  .grp { margin: 10px 0 4px; }
+  .grp { margin: 12px 0 4px; }
   .grp > label, .grp > .lbl { display: block; font-size: 12.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; margin-bottom: 6px; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .chip { border: 1px solid var(--line); background: var(--chip); color: var(--txt); border-radius: 999px; padding: 6px 12px; font-size: 14px; cursor: pointer; user-select: none; }
   .chip[aria-pressed="true"] { background: var(--acc); border-color: var(--acc); color: #fff; }
   @media (prefers-color-scheme: dark) { .chip[aria-pressed="true"] { color: #0e1a26; } }
   .chip .n { opacity: .7; font-size: 12px; margin-left: 3px; }
-  select, input[type=text].small { width: 100%; padding: 9px 10px; font-size: 15px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--txt); }
+  .chip.tit { background: var(--acc); border-color: var(--acc); color: #fff; padding-right: 8px; }
+  @media (prefers-color-scheme: dark) { .chip.tit { color: #0e1a26; } }
+  .chip.tit .x { margin-left: 6px; font-weight: 700; opacity: .8; }
+  .chip.add { border-style: dashed; background: transparent; color: var(--acc); }
+  select, input.small { width: 100%; padding: 9px 10px; font-size: 16px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--txt); }
   .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .addrow { display: flex; gap: 8px; margin-top: 8px; }
+  .addrow input { flex: 1; }
+  .btn { border: 1px solid var(--acc); background: var(--acc); color: #fff; border-radius: 10px; padding: 9px 14px; font-size: 15px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  @media (prefers-color-scheme: dark) { .btn { color: #0e1a26; } }
+  .btn.sec { background: transparent; color: var(--acc); }
   .chk { display: flex; align-items: center; gap: 8px; font-size: 14.5px; margin-top: 8px; }
+  .msg { font-size: 13px; color: var(--bad); margin: 6px 2px 0; min-height: 0; }
   .bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 6px 2px 10px; font-size: 13.5px; color: var(--muted); flex-wrap: wrap; }
-  .bar button { background: none; border: none; color: var(--acc); font-size: 13.5px; cursor: pointer; padding: 0; }
+  .bar button.link { background: none; border: none; color: var(--acc); font-size: 13.5px; cursor: pointer; padding: 0; }
+  .notif { background: var(--acc-soft); border-radius: 10px; padding: 10px 12px; margin-top: 12px; font-size: 13.5px; }
+  .notif .btn { width: 100%; margin-top: 8px; display: block; text-align: center; text-decoration: none; }
+  .notif .att { color: var(--muted); margin-top: 6px; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; margin-bottom: 10px; }
   .card h2 { font-size: 15.5px; margin: 0 0 4px; line-height: 1.35; }
   .meta { color: var(--muted); font-size: 13px; }
@@ -76,11 +90,26 @@
   <div class="sub" id="stato">Caricamento…</div>
 </header>
 <main>
-  <input class="search" id="q" type="search" placeholder="Cerca: informatico, Comune di Napoli, ASL…" autocomplete="off">
+  <input class="search" id="q" type="search" placeholder="Cerca: informatico, Comune di Napoli, L-9…" autocomplete="off">
+  <div class="hint">Scrivi una classe (es. <b>L-9</b>) per vedere solo i bandi che la citano.</div>
 
   <details class="filtri" id="pannello" open>
     <summary><span>Filtri <span id="nfiltri" class="meta"></span></span></summary>
     <div class="fbody">
+
+      <div class="grp"><span class="lbl">I tuoi titoli di studio</span>
+        <div class="chips" id="titoli"></div>
+        <div class="addrow">
+          <input class="small" type="text" id="nuovotit" list="elenco-titoli" placeholder="Aggiungi: L-9, ingegneria, diploma…" autocomplete="off" enterkeyhint="done">
+          <button class="btn" id="addtit" type="button">Aggiungi</button>
+        </div>
+        <datalist id="elenco-titoli"></datalist>
+        <div class="chips" id="rapidi" style="margin-top:8px"></div>
+        <div class="msg" id="msgtit"></div>
+        <label class="chk"><input type="checkbox" id="verificare"> Mostra anche i bandi da verificare</label>
+        <div class="hint">Con almeno un titolo vedi solo i bandi a cui puoi accedere con uno di essi.</div>
+      </div>
+
       <div class="row2">
         <div class="grp"><label for="regione">Regione</label><select id="regione"></select></div>
         <div class="grp"><label for="categoria">Tipo</label><select id="categoria"></select></div>
@@ -90,18 +119,6 @@
       <label class="chk"><input type="checkbox" id="nopres"> Escludi bandi con preselettiva</label>
 
       <div class="grp"><span class="lbl">Contratto</span><div class="chips" id="f-contratto"></div></div>
-
-      <div class="grp"><span class="lbl">Titolo di studio</span>
-        <div class="row2">
-          <div><input class="small" type="text" id="mialaurea" list="classi" placeholder="La tua laurea, es. L-31" autocomplete="off"></div>
-          <div><select id="compat">
-            <option value="tutti">Tutti i bandi</option>
-            <option value="forse">Compatibili o da verificare</option>
-            <option value="si">Solo compatibili</option>
-          </select></div>
-        </div>
-        <datalist id="classi"></datalist>
-      </div>
 
       <div class="row2">
         <div class="grp"><label for="ordina">Ordina per</label>
@@ -118,7 +135,9 @@
             <option value="14">Almeno 14 giorni</option>
           </select></div>
       </div>
-      <div class="bar" style="margin-bottom:0"><span></span><button id="reset" type="button">Azzera filtri</button></div>
+
+      <div class="notif" id="notif"></div>
+      <div class="bar" style="margin:10px 2px 0"><span></span><button class="link" id="reset" type="button">Azzera filtri</button></div>
     </div>
   </details>
 
@@ -127,76 +146,182 @@
 </main>
 <footer>
   Dati dal <a href="https://www.inpa.gov.it" target="_blank" rel="noopener">Portale inPA</a>, letti in automatico.
-  Prove, contratto e lauree sono ricavati dal testo del bando: verifica sempre sul bando ufficiale.
+  Prove, contratto e titoli sono ricavati dal testo del bando: verifica sempre sul bando ufficiale.
 </footer>
 
 <script>
 "use strict";
+// ======================= tabelle (le stesse di filtri.py) =======================
 const ETICHETTE = {
-  prove: {
-    solo_scritto: "Solo scritto", scritto_orale: "Scritto + orale", solo_orale: "Solo orale / colloquio",
-    titoli: "Solo titoli", titoli_colloquio: "Titoli + colloquio", non_rilevato: "Da verificare"
-  },
+  prove: { solo_scritto: "Solo scritto", scritto_orale: "Scritto + orale", solo_orale: "Solo orale / colloquio",
+           titoli: "Solo titoli", titoli_colloquio: "Titoli + colloquio", non_rilevato: "Da verificare" },
   contratto: { indeterminato: "Indeterminato", determinato: "Determinato", entrambi: "Ind. e det.", non_rilevato: "Da verificare" },
-  livello: { nessuno: "Scuola dell'obbligo", diploma: "Diploma", triennale: "Laurea triennale", magistrale: "Laurea magistrale", non_rilevato: "Titolo non rilevato" }
+  livello: { nessuno: "Scuola dell'obbligo", diploma: "Diploma", triennale: "Laurea triennale", magistrale: "Laurea magistrale" },
+  diplomi: { informatica: "informatico", elettronica: "elettronico", meccanica: "meccanico", geometra: "geometra/CAT",
+             ragioneria: "ragioneria/AFM", agraria: "agrario", chimica: "chimico", socio_sanitario: "socio-sanitario", turismo: "turistico" }
 };
-const LIV = { nessuno: 0, diploma: 1, triennale: 2, magistrale: 3 };
-// classe di laurea -> area disciplinare (stesse chiavi usate da aggiorna.py)
+const CODICI_PROVE = { solo_scritto: "S", scritto_orale: "O", solo_orale: "C", titoli: "T", titoli_colloquio: "K", non_rilevato: "N" };
+const CODICI_CONTR = { indeterminato: "I", determinato: "D", non_rilevato: "N" };
+const REGIONI = { "Abruzzo": "AB", "Basilicata": "BA", "Calabria": "CL", "Campania": "CM", "Emilia-Romagna": "ER",
+  "Friuli-Venezia Giulia": "FV", "Lazio": "LZ", "Liguria": "LI", "Lombardia": "LO", "Marche": "MA", "Molise": "MO",
+  "Piemonte": "PI", "Puglia": "PU", "Sardegna": "SA", "Sicilia": "SI", "Toscana": "TO", "Trentino-Alto Adige": "TA",
+  "Umbria": "UM", "Valle d'Aosta": "VA", "Veneto": "VE" };
+const DIPLOMI = {
+  "DIP": [null, "Diploma (qualsiasi)"], "DIP-INF": ["informatica", "Diploma informatico (perito)"],
+  "DIP-ELE": ["elettronica", "Diploma elettronico/elettrotecnico"], "DIP-MEC": ["meccanica", "Diploma meccanico"],
+  "DIP-GEO": ["geometra", "Diploma geometra/CAT"], "DIP-RAG": ["ragioneria", "Diploma ragioneria/AFM"],
+  "DIP-AGR": ["agraria", "Diploma agrario"], "DIP-CHI": ["chimica", "Diploma chimico/biotecnologico"],
+  "DIP-SOC": ["socio_sanitario", "Diploma socio-sanitario"], "DIP-TUR": ["turismo", "Diploma turistico/alberghiero"]
+};
+const CLASSI = {
+  "L-1": "Beni culturali", "L-2": "Biotecnologie", "L-3": "Arti, musica, spettacolo e moda", "L-4": "Disegno industriale",
+  "L-5": "Filosofia", "L-6": "Geografia", "L-7": "Ingegneria civile e ambientale", "L-8": "Ingegneria dell'informazione",
+  "L-9": "Ingegneria industriale", "L-10": "Lettere", "L-11": "Lingue e culture moderne", "L-12": "Mediazione linguistica",
+  "L-13": "Scienze biologiche", "L-14": "Scienze dei servizi giuridici", "L-15": "Scienze del turismo",
+  "L-16": "Scienze dell'amministrazione e dell'organizzazione", "L-17": "Scienze dell'architettura",
+  "L-18": "Economia e gestione aziendale", "L-19": "Scienze dell'educazione e della formazione", "L-20": "Scienze della comunicazione",
+  "L-21": "Pianificazione territoriale e urbanistica", "L-22": "Scienze motorie e sportive", "L-23": "Scienze e tecniche dell'edilizia",
+  "L-24": "Scienze e tecniche psicologiche", "L-25": "Scienze agrarie e forestali", "L-26": "Scienze agro-alimentari",
+  "L-27": "Scienze e tecnologie chimiche", "L-28": "Scienze della navigazione", "L-29": "Scienze farmaceutiche",
+  "L-30": "Scienze e tecnologie fisiche", "L-31": "Scienze e tecnologie informatiche", "L-32": "Scienze per l'ambiente e la natura",
+  "L-33": "Scienze economiche", "L-34": "Scienze geologiche", "L-35": "Scienze matematiche",
+  "L-36": "Scienze politiche e relazioni internazionali", "L-37": "Scienze sociali per la cooperazione", "L-38": "Scienze zootecniche",
+  "L-39": "Servizio sociale", "L-40": "Sociologia", "L-41": "Statistica", "L-42": "Storia", "L-43": "Conservazione e restauro dei beni culturali",
+  "L-SNT1": "Professioni sanitarie infermieristiche", "L-SNT2": "Professioni sanitarie della riabilitazione",
+  "L-SNT3": "Professioni sanitarie tecniche", "L-SNT4": "Professioni sanitarie della prevenzione",
+  "LM-4": "Architettura e ingegneria edile", "LM-6": "Biologia", "LM-13": "Farmacia", "LM-14": "Filologia moderna",
+  "LM-16": "Finanza", "LM-17": "Fisica", "LM-18": "Informatica", "LM-20": "Ingegneria aerospaziale",
+  "LM-21": "Ingegneria biomedica", "LM-22": "Ingegneria chimica", "LM-23": "Ingegneria civile", "LM-24": "Ingegneria dei sistemi edilizi",
+  "LM-25": "Ingegneria dell'automazione", "LM-26": "Ingegneria della sicurezza", "LM-27": "Ingegneria delle telecomunicazioni",
+  "LM-28": "Ingegneria elettrica", "LM-29": "Ingegneria elettronica", "LM-30": "Ingegneria energetica e nucleare",
+  "LM-31": "Ingegneria gestionale", "LM-32": "Ingegneria informatica", "LM-33": "Ingegneria meccanica",
+  "LM-35": "Ingegneria per l'ambiente e il territorio", "LM-40": "Matematica", "LM-41": "Medicina e chirurgia",
+  "LM-48": "Pianificazione territoriale", "LM-51": "Psicologia", "LM-52": "Relazioni internazionali", "LM-54": "Scienze chimiche",
+  "LM-56": "Scienze dell'economia", "LM-57": "Scienze dell'educazione degli adulti", "LM-59": "Comunicazione pubblica e d'impresa",
+  "LM-62": "Scienze della politica", "LM-63": "Scienze delle pubbliche amministrazioni", "LM-66": "Sicurezza informatica",
+  "LM-69": "Scienze agrarie", "LM-74": "Scienze geologiche", "LM-75": "Scienze per l'ambiente e il territorio",
+  "LM-77": "Scienze economico-aziendali", "LM-82": "Scienze statistiche", "LM-83": "Scienze statistiche attuariali e finanziarie",
+  "LM-85": "Scienze pedagogiche", "LM-87": "Servizio sociale e politiche sociali", "LM-88": "Sociologia",
+  "LM-89": "Storia dell'arte", "LM-90": "Studi europei", "LM-91": "Tecniche e metodi per la società dell'informazione",
+  "LMG-01": "Giurisprudenza"
+};
 const AREA_CLASSE = {
   "L-31": "informatica", "LM-18": "informatica", "LM-66": "informatica", "LM-91": "informatica",
-  "L-8": "ingegneria", "L-7": "ingegneria", "L-9": "ingegneria", "LM-32": "ingegneria", "LM-23": "ingegneria",
-  "LM-24": "ingegneria", "LM-25": "ingegneria", "LM-27": "ingegneria", "LM-29": "ingegneria", "LM-33": "ingegneria",
+  "L-7": "ingegneria", "L-8": "ingegneria", "L-9": "ingegneria", "L-23": "ingegneria", "L-28": "ingegneria",
+  "LM-20": "ingegneria", "LM-21": "ingegneria", "LM-22": "ingegneria", "LM-23": "ingegneria", "LM-24": "ingegneria",
+  "LM-25": "ingegneria", "LM-26": "ingegneria", "LM-27": "ingegneria", "LM-28": "ingegneria", "LM-29": "ingegneria",
+  "LM-30": "ingegneria", "LM-31": "ingegneria", "LM-32": "ingegneria", "LM-33": "ingegneria", "LM-35": "ingegneria",
   "LMG-01": "giurisprudenza", "L-14": "giurisprudenza",
-  "L-18": "economia", "L-33": "economia", "L-41": "economia", "LM-56": "economia", "LM-77": "economia", "LM-82": "economia", "LM-16": "economia",
-  "L-16": "scienze_politiche", "L-36": "scienze_politiche", "L-40": "scienze_politiche", "LM-52": "scienze_politiche", "LM-62": "scienze_politiche", "LM-63": "scienze_politiche", "LM-88": "scienze_politiche",
-  "L-24": "psicologia", "LM-51": "psicologia",
-  "L-39": "servizio_sociale", "LM-87": "servizio_sociale",
-  "L-19": "educazione", "LM-85": "educazione", "LM-57": "educazione",
+  "L-18": "economia", "L-33": "economia", "L-41": "economia", "LM-16": "economia", "LM-56": "economia",
+  "LM-77": "economia", "LM-82": "economia", "LM-83": "economia",
+  "L-16": "scienze_politiche", "L-20": "scienze_politiche", "L-36": "scienze_politiche", "L-37": "scienze_politiche",
+  "L-40": "scienze_politiche", "LM-52": "scienze_politiche", "LM-59": "scienze_politiche", "LM-62": "scienze_politiche",
+  "LM-63": "scienze_politiche", "LM-88": "scienze_politiche", "LM-90": "scienze_politiche",
+  "L-24": "psicologia", "LM-51": "psicologia", "L-39": "servizio_sociale", "LM-87": "servizio_sociale",
+  "L-19": "educazione", "LM-57": "educazione", "LM-85": "educazione",
   "L-17": "architettura", "L-21": "architettura", "LM-4": "architettura", "LM-48": "architettura",
-  "L-10": "umanistica", "L-1": "umanistica", "L-5": "umanistica", "L-11": "umanistica", "L-12": "umanistica", "LM-14": "umanistica", "LM-89": "umanistica",
-  "L-27": "scienze", "L-30": "scienze", "L-32": "scienze", "L-34": "scienze", "L-25": "scienze", "L-13": "sanita", "LM-6": "sanita", "LM-41": "sanita", "LM-13": "sanita"
+  "L-1": "umanistica", "L-3": "umanistica", "L-5": "umanistica", "L-6": "umanistica", "L-10": "umanistica",
+  "L-11": "umanistica", "L-12": "umanistica", "L-15": "umanistica", "L-42": "umanistica", "L-43": "umanistica",
+  "LM-14": "umanistica", "LM-89": "umanistica",
+  "L-2": "scienze", "L-13": "sanita", "L-25": "scienze", "L-26": "scienze", "L-27": "scienze", "L-29": "sanita",
+  "L-30": "scienze", "L-32": "scienze", "L-34": "scienze", "L-35": "scienze", "L-38": "scienze",
+  "LM-6": "sanita", "LM-13": "sanita", "LM-17": "scienze", "LM-40": "scienze", "LM-54": "scienze",
+  "LM-69": "scienze", "LM-74": "scienze", "LM-75": "scienze", "LM-41": "sanita"
 };
+const LAUREA_DIPLOMA = { informatica: ["informatica"], ingegneria: ["informatica", "elettronica", "meccanica", "geometra"],
+  architettura: ["geometra"], economia: ["ragioneria"], scienze: ["agraria", "chimica"],
+  servizio_sociale: ["socio_sanitario"], sanita: ["socio_sanitario", "chimica"] };
+const LIV = { nessuno: 0, diploma: 1, triennale: 2, magistrale: 3 };
+const RANGO = { si: 3, forse: 2, "?": 1, no: 0 };
 const PASSO = 60;
+const RAPIDI = ["DIP-INF", "DIP", "L-31", "L-8", "L-9"];
 
+// ======================= utilità =======================
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const ls = {
   get(k, d) { try { const v = localStorage.getItem("cc_" + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem("cc_" + k, JSON.stringify(v)); } catch {} }
 };
+const RE_CLASSE = /^(LMG|LM|LS|L)[-/]?(SNT)?(\d{1,2})$/;
 
-const DEFAULT = { q: "", regione: "Campania", categoria: "", prove: [], contratto: [], nopres: false, mialaurea: "L-31", compat: "tutti", ordina: "scadenza", scadmin: 0 };
-let F = Object.assign({}, DEFAULT, ls.get("filtri", {}));
-let DATI = [], mostrati = PASSO;
-
-function normClasse(s) {
-  const m = String(s || "").toUpperCase().replace(/\s+/g, "").match(/^(LMG|LM|LS|L)[-/]?(SNT)?(\d{1,2})$/);
-  if (!m) return String(s || "").trim().toUpperCase();
+function normTitolo(s) {
+  const u = String(s || "").trim().toUpperCase().replace(/\s+/g, "");
+  if (DIPLOMI[u]) return u;
+  const m = u.match(RE_CLASSE);
+  if (!m) return null;
   if (m[1] === "LMG") return "LMG-01";
   return m[1] + "-" + (m[2] ? "SNT" : "") + parseInt(m[3], 10);
 }
-function livelloMio(c) {
-  if (!c) return null;
-  if (/^DIPLOMA/i.test(c)) return 1;
+// accetta un codice (L-9, l9, LM18) oppure parte del nome ("ingegneria industriale", "diploma informatico")
+function cercaTitolo(testo) {
+  const t = String(testo || "").trim();
+  if (!t) return { err: "" };
+  const cod = normTitolo(t.split(/\s|–|—/)[0]);
+  if (cod) return { cod };
+  const q = t.toLowerCase();
+  const tutti = Object.entries(DIPLOMI).map(([k, v]) => [k, v[1]]).concat(Object.entries(CLASSI));
+  const esatto = tutti.find(([, n]) => n.toLowerCase() === q);
+  if (esatto) return { cod: esatto[0] };
+  const trovati = tutti.filter(([k, n]) => (k + " " + n).toLowerCase().includes(q));
+  if (trovati.length === 1) return { cod: trovati[0][0] };
+  if (!trovati.length) return { err: `Nessun titolo trovato per «${t}». Prova con la classe, es. L-9.` };
+  return { err: `Più titoli per «${t}»: ${trovati.slice(0, 5).map(([k, n]) => k + " " + n).join(", ")}${trovati.length > 5 ? "…" : ""}. Sii più preciso o scegli dall'elenco.` };
+}
+function etichettaTitolo(c) { return DIPLOMI[c] ? DIPLOMI[c][1] : c + (CLASSI[c] ? " " + CLASSI[c] : ""); }
+function brevetitolo(c) { return DIPLOMI[c] ? DIPLOMI[c][1] : c; }
+function livelloTitolo(c) {
+  if (DIPLOMI[c]) return 1;
   if (/^L-/.test(c)) return 2;
   if (/^(LM|LS|LMG)-/.test(c)) return 3;
   return null;
 }
 
-// "si" | "forse" | "no" | "?"
-function compatibile(b, mia) {
+// ======================= compatibilità (come filtri.py) =======================
+function compatibile(b, tit) {
   const a = b.analisi;
-  if (!a || !mia) return "?";
-  const t = a.titolo, mio = livelloMio(mia), req = LIV[t.livello];
+  if (!a || !tit) return "?";
+  const t = a.titolo, req = LIV[t.livello];
+  const dipl = t.diplomi || [];
+  const dipOk = !dipl.length || (t.diploma_qualsiasi ?? true);
+  if (DIPLOMI[tit]) {
+    if (req === undefined) return "?";
+    if (req >= 2) return "no";
+    const area = DIPLOMI[tit][0];
+    if (dipOk || (area && dipl.includes(area))) return "si";
+    return area ? "no" : "forse";
+  }
+  const mio = livelloTitolo(tit), area = AREA_CLASSE[tit];
   if (req !== undefined && mio !== null && mio < req) return "no";
-  if (req !== undefined && req <= 1) return "si";
-  if (t.classi.includes(mia)) return "si";
-  if (t.qualsiasi_laurea) return "si";
-  const area = AREA_CLASSE[mia];
+  if (req !== undefined && req <= 1) {
+    if (dipOk || dipl.some(d => (LAUREA_DIPLOMA[area] || []).includes(d))) return "si";
+    return "forse";
+  }
+  if (t.classi.includes(tit) || t.qualsiasi_laurea) return "si";
   if (area && t.aree.includes(area)) return "forse";
   if (t.classi.length || t.aree.length) return "no";
   return "?";
 }
+function compatMigliore(b, titoli) {
+  let best = ["no", ""];
+  for (const tit of titoli) {
+    const k = compatibile(b, tit);
+    if (RANGO[k] > RANGO[best[0]]) best = [k, tit];
+  }
+  return best;
+}
+
+// ======================= stato =======================
+const DEFAULT = { q: "", regione: "Campania", categoria: "", prove: [], contratto: [], nopres: false,
+                  titoli: ["L-31"], verificare: true, ordina: "scadenza", scadmin: 0 };
+let F = Object.assign({}, DEFAULT, ls.get("filtri", {}));
+if (!Array.isArray(F.titoli)) F.titoli = [];
+if (F.mialaurea) {    // vecchia versione della pagina: un solo titolo
+  const c = normTitolo(F.mialaurea);
+  if (c && !F.titoli.includes(c)) F.titoli = [c];
+  delete F.mialaurea; delete F.compat;
+}
+let DATI = [], NOTIF = null, mostrati = PASSO;
 
 function giorniA(scad) {
   if (!scad) return null;
@@ -209,29 +334,37 @@ function fmtData(s) {
   return isNaN(d) ? s : d.toLocaleDateString("it-IT", { day: "numeric", month: "short", year: "numeric" });
 }
 
+// la ricerca separa le classi (L-9) dalle parole normali
+function analizzaRicerca(q) {
+  const classi = [], parole = [];
+  for (const w of String(q || "").toLowerCase().split(/\s+/).filter(Boolean)) {
+    const c = normTitolo(w);
+    if (c && !DIPLOMI[c]) classi.push(c); else parole.push(w);
+  }
+  return { classi, parole };
+}
+
 function passa(b, ignora) {
   const a = b.analisi;
   const g = giorniA(b.scadenza);
   if (g !== null && g < Number(F.scadmin || 0)) return false;
   if (F.regione && ignora !== "regione" && b.regione !== F.regione) return false;
   if (F.categoria && ignora !== "categoria" && b.categoria !== F.categoria) return false;
-  if (F.prove.length && ignora !== "prove") {
-    const v = a ? a.prove.prove : "non_rilevato";
-    if (!F.prove.includes(v)) return false;
-  }
+  if (F.prove.length && ignora !== "prove" && !F.prove.includes(a ? a.prove.prove : "non_rilevato")) return false;
   if (F.nopres && a && a.prove.preselettiva) return false;
   if (F.contratto.length && ignora !== "contratto") {
     const v = a ? a.contratto.contratto : "non_rilevato";
     if (!(F.contratto.includes(v) || (v === "entrambi" && F.contratto.some(x => x === "indeterminato" || x === "determinato")))) return false;
   }
-  if (F.compat !== "tutti") {
-    const c = compatibile(b, normClasse(F.mialaurea));
-    if (F.compat === "si" && c !== "si") return false;
-    if (F.compat === "forse" && c === "no") return false;
+  if (F.titoli.length) {
+    const [k] = compatMigliore(b, F.titoli);
+    if (k === "no" || (!F.verificare && k !== "si")) return false;
   }
   if (F.q) {
+    const { classi, parole } = analizzaRicerca(F.q);
+    if (classi.length && !(a && classi.some(c => a.titolo.classi.includes(c)))) return false;
     const hay = (b.titolo + " " + b.profilo + " " + b.ente + " " + b.sedi.join(" ") + " " + (b.settori || []).join(" ")).toLowerCase();
-    if (!F.q.toLowerCase().split(/\s+/).filter(Boolean).every(w => hay.includes(w))) return false;
+    if (!parole.every(w => hay.includes(w))) return false;
   }
   return true;
 }
@@ -246,6 +379,7 @@ function conta(campo, chiave) {
   return n;
 }
 
+// ======================= disegno =======================
 function chips(el, campo, opzioni, conteggi) {
   el.innerHTML = opzioni.map(([k, lab]) =>
     `<button type="button" class="chip" data-k="${esc(k)}" aria-pressed="${F[campo].includes(k)}">${esc(lab)}<span class="n">${conteggi[k] || 0}</span></button>`
@@ -257,20 +391,33 @@ function chips(el, campo, opzioni, conteggi) {
     salva(); disegna();
   };
 }
-
 function selectOpzioni(el, campo, conteggi, tuttiLabel) {
   const chiavi = Object.keys(conteggi).filter(Boolean).sort((a, b) => a.localeCompare(b, "it"));
   if (F[campo] && !chiavi.includes(F[campo])) chiavi.unshift(F[campo]);
   el.innerHTML = `<option value="">${esc(tuttiLabel)}</option>` +
     chiavi.map(k => `<option value="${esc(k)}"${k === F[campo] ? " selected" : ""}>${esc(k)} (${conteggi[k] || 0})</option>`).join("");
 }
+function disegnaTitoli() {
+  $("titoli").innerHTML = F.titoli.length
+    ? F.titoli.map(c => `<button type="button" class="chip tit" data-k="${esc(c)}" title="Rimuovi">${esc(etichettaTitolo(c))}<span class="x">✕</span></button>`).join("")
+    : `<span class="meta">Nessun titolo: vedi tutti i bandi.</span>`;
+  const rap = RAPIDI.filter(c => !F.titoli.includes(c));
+  $("rapidi").innerHTML = rap.map(c => `<button type="button" class="chip add" data-k="${c}">+ ${esc(brevetitolo(c))}</button>`).join("");
+}
+function aggiungiTitolo(testo) {
+  const r = cercaTitolo(testo);
+  $("msgtit").textContent = r.err || "";
+  if (!r.cod) return;
+  if (!F.titoli.includes(r.cod)) F.titoli = F.titoli.concat(r.cod);
+  $("nuovotit").value = "";
+  salva(); disegna();
+}
 
 function badge(cls, txt, dubbio) { return `<span class="b ${cls}${dubbio ? " dub" : ""}">${esc(txt)}${dubbio ? " ?" : ""}</span>`; }
 
-function scheda(b, mia) {
+function scheda(b) {
   const a = b.analisi, g = giorniA(b.scadenza);
-  let bad = "";
-  let why = "";
+  let bad = "", why = "";
   if (a) {
     const p = a.prove, c = a.contratto, t = a.titolo;
     bad += badge("p", p.prove === "non_rilevato" ? "Prove da verificare" : (ETICHETTE.prove[p.prove] || p.prove), p.conf === "bassa" && p.prove !== "non_rilevato");
@@ -278,14 +425,18 @@ function scheda(b, mia) {
     if (p.pratica) bad += badge("", "Prova pratica");
     bad += badge("", c.contratto === "non_rilevato" ? "Contratto da verificare" : (ETICHETTE.contratto[c.contratto] || c.contratto), c.conf === "bassa" && c.contratto !== "non_rilevato");
     if (c.part_time) bad += badge("", "Part-time");
-    if (t.livello !== "non_rilevato") bad += badge("", ETICHETTE.livello[t.livello] || t.livello);
+    if (t.livello in ETICHETTE.livello) {
+      const dip = t.livello === "diploma" && (t.diplomi || []).length && !t.diploma_qualsiasi
+        ? " " + t.diplomi.map(d => ETICHETTE.diplomi[d] || d).join("/") : "";
+      bad += badge("", ETICHETTE.livello[t.livello] + dip);
+    }
     if (t.classi.length) bad += badge("", t.classi.slice(0, 6).join(" · ") + (t.classi.length > 6 ? " …" : ""));
     if (t.qualsiasi_laurea) bad += badge("", "Qualsiasi laurea");
-    if (mia) {
-      const k = compatibile(b, mia);
-      if (k === "si") bad += badge("ok", "Compatibile con " + mia);
-      else if (k === "forse") bad += badge("warn", "Da verificare per " + mia);
-      else if (k === "no") bad += badge("bad", "Non per " + mia);
+    if (F.titoli.length) {
+      const [k, tit] = compatMigliore(b, F.titoli);
+      if (k === "si") bad += badge("ok", "✓ " + brevetitolo(tit));
+      else if (k === "forse") bad += badge("warn", "Da verificare: " + brevetitolo(tit));
+      else if (k === "?") bad += badge("warn", "Titolo da verificare");
     }
     const righe = [];
     if (p.perche) righe.push(`<p><b>Prove:</b> ${esc(p.perche)}</p>`);
@@ -316,8 +467,44 @@ function ordina(arr) {
     (x.scadenza || "9999").localeCompare(y.scadenza || "9999"));
 }
 
+// ======================= notifiche =======================
+function codiceFiltri() {
+  const p = [];
+  if (F.regione && REGIONI[F.regione]) p.push("R" + REGIONI[F.regione]);
+  if (F.prove.length) p.push("P" + F.prove.map(x => CODICI_PROVE[x]).join(""));
+  if (F.contratto.length) p.push("C" + F.contratto.map(x => CODICI_CONTR[x]).join(""));
+  if (F.titoli.length) p.push("T" + F.titoli.map(c => DIPLOMI[c] ? (c === "DIP" ? "D" : "D" + c.slice(4)) : c.replace(/-/g, "")).join("-"));
+  if (!F.verificare) p.push("VS");
+  if (F.nopres) p.push("X");
+  return p.join("_");
+}
+function descriviFiltri() {
+  const p = [F.regione || "Tutte le regioni"];
+  if (F.prove.length) p.push(F.prove.map(x => ETICHETTE.prove[x]).join("/"));
+  if (F.contratto.length) p.push(F.contratto.map(x => ETICHETTE.contratto[x]).join("/"));
+  if (F.titoli.length) p.push(F.titoli.map(brevetitolo).join(", ") + (F.verificare ? " (anche da verificare)" : " (solo certi)"));
+  if (F.nopres) p.push("senza preselettiva");
+  return p.join(" · ");
+}
+function disegnaNotifiche(nRis) {
+  const el = $("notif");
+  if (!NOTIF || !NOTIF.bot) {
+    el.innerHTML = `🔔 <b>Notifiche</b>: collega il bot Telegram (vedi README) per ricevere i concorsi nuovi.`;
+    return;
+  }
+  let cod = codiceFiltri(), avviso = "";
+  if (cod.length > 64) { avviso = "<br>⚠️ Troppi filtri per un solo link: togli qualche titolo."; cod = ""; }
+  const extra = (F.q || F.categoria || Number(F.scadmin) > 0) ? "<br><i>Ricerca libera, tipo e scadenza non valgono per le notifiche.</i>" : "";
+  const att = NOTIF.filtri ? `Notifiche attuali${NOTIF.pausa ? " (in pausa)" : ""}: ${esc(descriviFiltri.call(null, NOTIF.filtri))}` : "";
+  el.innerHTML = `🔔 <b>Notifiche Telegram</b> per i concorsi <b>nuovi</b> con questi filtri:<br>${esc(descriviFiltri())} — oggi ${nRis} bandi.${extra}${avviso}
+    ${cod ? `<a class="btn" href="https://t.me/${esc(NOTIF.bot)}?start=${encodeURIComponent(cod)}" target="_blank" rel="noopener">🔔 Usa questi filtri per le notifiche</a>
+    <div class="att">Si apre Telegram: premi <b>Avvia</b>. Il bot conferma entro 10-20 minuti.</div>` : ""}
+    ${att ? `<div class="att">${att}</div>` : ""}`;
+}
+
+// ======================= ciclo principale =======================
 function disegna() {
-  const mia = normClasse(F.mialaurea);
+  disegnaTitoli();
   selectOpzioni($("regione"), "regione", conta("regione", b => b.regione), "Tutte le regioni");
   selectOpzioni($("categoria"), "categoria", conta("categoria", b => b.categoria), "Tutti i tipi");
   chips($("f-prove"), "prove", Object.entries(ETICHETTE.prove), conta("prove", b => b.analisi ? b.analisi.prove.prove : "non_rilevato"));
@@ -326,46 +513,77 @@ function disegna() {
   chips($("f-contratto"), "contratto", [["indeterminato", "Indeterminato"], ["determinato", "Determinato"], ["non_rilevato", "Da verificare"]], cc);
 
   const ris = ordina(DATI.filter(b => passa(b)));
-  const attivi = [F.regione, F.categoria, F.q, F.nopres, F.compat !== "tutti", Number(F.scadmin) > 0].filter(Boolean).length + F.prove.length + F.contratto.length;
+  const attivi = [F.regione, F.categoria, F.q, F.nopres, Number(F.scadmin) > 0, F.titoli.length].filter(Boolean).length + F.prove.length + F.contratto.length;
   $("nfiltri").textContent = attivi ? `(${attivi} attivi)` : "";
   $("conteggio").textContent = `${ris.length} bandi trovati`;
-  const html = ris.slice(0, mostrati).map(b => scheda(b, mia)).join("");
+  const html = ris.slice(0, mostrati).map(scheda).join("");
   $("lista").innerHTML = ris.length
     ? html + (ris.length > mostrati ? `<button class="more" id="altri" type="button">Mostra altri ${Math.min(PASSO, ris.length - mostrati)}</button>` : "")
     : `<div class="empty">Nessun bando con questi filtri.</div>`;
   const altri = $("altri");
   if (altri) altri.onclick = () => { mostrati += PASSO; disegna(); };
+  disegnaNotifiche(ris.length);
 }
 
 function salva() { mostrati = PASSO; ls.set("filtri", F); }
 
 function collega() {
-  const set = (id, campo, ev = "change", tr = v => v) => {
+  const set = (id, campo, ev = "change") => {
     const el = $(id);
     if (el.type === "checkbox") el.checked = !!F[campo]; else el.value = F[campo];
-    el.addEventListener(ev, () => { F[campo] = tr(el.type === "checkbox" ? el.checked : el.value); salva(); disegna(); });
+    el.addEventListener(ev, () => { F[campo] = el.type === "checkbox" ? el.checked : el.value; salva(); disegna(); });
   };
   set("q", "q", "input");
   set("regione", "regione");
   set("categoria", "categoria");
   set("nopres", "nopres");
-  set("mialaurea", "mialaurea", "change");
-  set("compat", "compat");
+  set("verificare", "verificare");
   set("ordina", "ordina");
   set("scadmin", "scadmin");
+
+  $("elenco-titoli").innerHTML =
+    Object.entries(DIPLOMI).map(([k, v]) => `<option value="${k}">${esc(v[1])}</option>`).join("") +
+    Object.entries(CLASSI).map(([k, v]) => `<option value="${k} ${esc(v)}"></option>`).join("");
+  $("addtit").onclick = () => aggiungiTitolo($("nuovotit").value);
+  $("nuovotit").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); aggiungiTitolo($("nuovotit").value); } });
+  // scelta dall'elenco a tendina: aggiunge subito
+  $("nuovotit").addEventListener("input", e => {
+    const v = $("nuovotit").value;
+    if (e.inputType === "insertReplacementText" || e.inputType === undefined) {
+      if (cercaTitolo(v).cod && (DIPLOMI[v] || Object.keys(CLASSI).some(k => v.startsWith(k + " ")))) aggiungiTitolo(v);
+    }
+  });
+  $("titoli").onclick = e => {
+    const c = e.target.closest(".chip.tit"); if (!c) return;
+    F.titoli = F.titoli.filter(x => x !== c.dataset.k); salva(); disegna();
+  };
+  $("rapidi").onclick = e => {
+    const c = e.target.closest(".chip.add"); if (!c) return;
+    F.titoli = F.titoli.concat(c.dataset.k); salva(); disegna();
+  };
   $("reset").onclick = () => {
-    F = Object.assign({}, DEFAULT, { mialaurea: F.mialaurea, regione: "" });
-    ["q", "nopres", "compat", "ordina", "scadmin", "mialaurea"].forEach(id => {
+    F = Object.assign({}, DEFAULT, { titoli: F.titoli, regione: "" });
+    ["q", "nopres", "verificare", "ordina", "scadmin"].forEach(id => {
       const el = $(id); if (el.type === "checkbox") el.checked = !!F[id]; else el.value = F[id];
     });
     salva(); disegna();
   };
-  $("classi").innerHTML = Object.keys(AREA_CLASSE).sort().map(c => `<option value="${c}">`).join("");
   if (matchMedia("(max-width: 600px)").matches && ls.get("filtri", null)) $("pannello").open = false;
 }
 
+// descriviFiltri per i filtri salvati dal bot (stesso formato di filtri.py)
+descriviFiltri.call = (_, f) => {
+  const p = [(f.regioni || []).join("/") || "Tutte le regioni"];
+  if ((f.prove || []).length) p.push(f.prove.map(x => ETICHETTE.prove[x] || x).join("/"));
+  if ((f.contratto || []).length) p.push(f.contratto.map(x => ETICHETTE.contratto[x] || x).join("/"));
+  if ((f.titoli || []).length) p.push(f.titoli.map(brevetitolo).join(", ") + (f.verificare === false ? " (solo certi)" : " (anche da verificare)"));
+  if (f.nopres) p.push("senza preselettiva");
+  return p.join(" · ");
+};
+
 async function avvia() {
   collega();
+  try { NOTIF = await (await fetch("data/notifiche.json?t=" + Date.now(), { cache: "no-store" })).json(); } catch { NOTIF = null; }
   try {
     const r = await fetch("data/bandi.json?t=" + Date.now(), { cache: "no-store" });
     if (!r.ok) throw new Error("HTTP " + r.status);
