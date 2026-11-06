@@ -78,7 +78,7 @@ LAUREA_DIPLOMA = {"informatica": ["informatica"], "ingegneria": ["informatica", 
 RANGO = {"si": 3, "forse": 2, "?": 1, "no": 0}
 
 # avvisi per idonei in graduatorie di altri enti (riconosciuti dal titolo; stessa logica in index.html)
-RE_GRAD = re.compile(r"idone[io]|utilizz\w*\s+(?:di\s+)?(?:idonei\s+)?(?:delle\s+|di\s+)?graduatori|"
+RE_GRAD = re.compile(r"idone[io]|interpell|elenc\w*\s+(?:degli\s+|di\s+)?idonei|albo\s+(?:degli\s+)?idonei|\basmel|utilizz\w*\s+(?:di\s+)?(?:idonei\s+)?(?:delle\s+|di\s+)?graduatori|"
                      r"scorriment\w*\s+(?:di\s+|delle\s+)?graduatori|"
                      r"graduatori\w*\s+(?:\S+\s+){0,6}(?:da|di)\s+altr[ie]\s+(?:enti|amministrazioni|pp\.?\s*aa)")
 LIV_PROF = [("D", re.compile(r"dirigent")),
@@ -133,19 +133,38 @@ def graduatoria(b: dict) -> dict | None:
     aree = [k for k, (_, r) in AREE_PROF.items() if r.search(t)]
     nome = f"{NOMI_LIV.get(liv, 'Profilo')} {'/'.join(AREE_PROF[a][0] for a in aree)}".strip()
     comp = ((b.get("analisi") or {}).get("comparto") or "") or comparto_da_testo(t)
-    return {"liv": liv, "aree": aree, "nome": nome, "comparto": comp}
+    # elenchi di idonei: ASMEL (Comuni associati) o altri elenchi/interpelli non specificati
+    elenco = "ASMEL" if re.search(r"\basmel", t) else "ALTRO" if re.search(r"interpell|elenc\w*\s+(?:degli\s+|di\s+)?idonei|albo\s+(?:degli\s+)?idonei", t) else ""
+    if elenco == "ASMEL":
+        comp = "L"
+    return {"liv": liv, "aree": aree, "nome": nome, "comparto": comp, "elenco": elenco}
+
+
+def etichetta_avviso(g: dict) -> str:
+    if g.get("elenco") == "ASMEL":
+        return f"Interpello elenco ASMEL · {g['nome']}"
+    if g.get("elenco") == "ALTRO":
+        return f"Interpello/elenco idonei · {g['nome']}"
+    return f"Idonei in graduatoria · {g['nome']}" + (f" ({COMPARTI[g['comparto']]})" if g.get("comparto") else "")
 
 
 def nome_idoneita(c: str) -> str:
-    """codice idoneita': livello(1) + area(3) + comparto(1, facoltativo) es. AINFC"""
+    """codice idoneita': livello(1) + area(3) + comparto(1: L/C/S/U, X = non indicato) + fonte(1, facoltativa: A = elenco ASMEL)
+    es. AINFC = assistente informatico Funzioni Centrali; IAMMLA = istruttore amministrativo, elenco ASMEL"""
     comp = COMPARTI.get(c[4:5], "")
-    return f"{NOMI_LIV.get(c[:1], '')} {AREE_PROF.get(c[1:4], (c[1:4],))[0]}".strip() + (f" ({comp})" if comp else "")
+    base = f"{NOMI_LIV.get(c[:1], '')} {AREE_PROF.get(c[1:4], (c[1:4],))[0]}".strip()
+    if c[5:6] == "A":
+        return base + " (elenco ASMEL)"
+    return base + (f" ({comp})" if comp else "")
 
 
 def compat_idoneita(g: dict, idon: list[str]) -> tuple[str, str]:
     best = ("no", "")
     for c in idon:
-        liv, area, comp = LIV_EQ.get(c[:1], c[:1]), c[1:4], c[4:5]
+        liv, area, comp = LIV_EQ.get(c[:1], c[:1]), c[1:4], c[4:5].replace("X", "")
+        asmel = c[5:6] == "A"
+        if (g.get("elenco") == "ASMEL") != asmel:     # interpello ASMEL: vale solo l'iscrizione all'elenco ASMEL, e viceversa
+            continue
         gliv = LIV_EQ.get(g["liv"], g["liv"])
         stessa_area, stesso_liv = area in g["aree"], gliv == liv
         if stessa_area and stesso_liv:
@@ -159,6 +178,8 @@ def compat_idoneita(g: dict, idon: list[str]) -> tuple[str, str]:
                 k = "forse"
             elif comp != g["comparto"]:
                 k = "no"
+        if k == "si" and g.get("elenco") == "ALTRO":   # interpello su un elenco non riconosciuto: da verificare
+            k = "forse"
         if RANGO[k] > RANGO[best[0]]:
             best = (k, c)
     return best
@@ -168,11 +189,12 @@ def valuta(b: dict, f: dict) -> tuple[str, str] | None:
     """(esito, descrizione) rispetto a titoli e idoneita' dell'utente; None se non ci sono filtri sui requisiti"""
     g = graduatoria(b)
     if g:
+        req = g["nome"] + (" (elenco ASMEL)" if g.get("elenco") == "ASMEL" else f" ({COMPARTI[g['comparto']]})" if g.get("comparto") else "")
         idon = f.get("idoneita") or []
         if not idon:
-            return "?", f"serve idoneità: {g['nome']}"
+            return "?", f"serve idoneità: {req}"
         k, c = compat_idoneita(g, idon)
-        return k, {"si": f"idoneo {nome_idoneita(c)}", "forse": f"idoneità da verificare: {g['nome']}"}.get(k, f"serve idoneità: {g['nome']}")
+        return k, {"si": f"idoneo {nome_idoneita(c)}", "forse": f"idoneità da verificare: {req}"}.get(k, f"serve idoneità: {req}")
     if not f.get("titoli"):
         return None
     k, tit = compat_migliore(b, f["titoli"])
@@ -332,7 +354,7 @@ def decodifica(codice: str) -> dict | None:
                 f["titoli"] = [t for t in tit if t in DIPLOMI or livello_titolo(t)]
             elif k == "I":
                 f["idoneita"] = [x for x in v.split("-") if x[:1] in NOMI_LIV and x[1:4] in AREE_PROF
-                                 and (len(x) == 4 or x[4:5] in COMPARTI)]
+                                 and (len(x) == 4 or x[4:5] in COMPARTI or x[4:5] == "X") and x[5:6] in ("", "A")]
             elif k == "Y":
                 f["tipi"] = [x for x in v if x in TIPI]
             elif tok == "G0":                       # vecchio formato: "senza avvisi per idonei"
@@ -401,7 +423,7 @@ def scheda(b: dict, f: dict) -> dict:
     a = b["analisi"]
     p, c = a["prove"], a["contratto"]
     g = graduatoria(b)
-    tag = ([f"Idonei in graduatoria · {g['nome']}" + (f" ({COMPARTI[g['comparto']]})" if g.get("comparto") else "")] if g else []) + [ETICHETTE_PROVE.get(p["prove"], p["prove"]) + (" (incerto)" if p["conf"] == "bassa" and p["prove"] != "non_rilevato" else "")]
+    tag = ([etichetta_avviso(g)] if g else []) + [ETICHETTE_PROVE.get(p["prove"], p["prove"]) + (" (incerto)" if p["conf"] == "bassa" and p["prove"] != "non_rilevato" else "")]
     if p["preselettiva"]:
         tag.append("preselettiva")
     tag.append(ETICHETTE_CONTR.get(c["contratto"], c["contratto"]))
