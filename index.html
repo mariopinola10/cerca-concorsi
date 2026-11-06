@@ -111,10 +111,12 @@
         <div class="hint">Con almeno un titolo vedi solo i bandi a cui puoi accedere con uno di essi.</div>
       </div>
 
-      <div class="row2">
-        <div class="grp"><label for="regione">Regione</label><select id="regione"></select></div>
-        <div class="grp"><label for="categoria">Tipo</label><select id="categoria"></select></div>
+      <div class="grp"><span class="lbl">Regioni</span>
+        <div class="chips" id="regioni"></div>
+        <select id="addreg" style="margin-top:8px"></select>
       </div>
+
+      <div class="grp"><label for="categoria">Tipo</label><select id="categoria"></select></div>
 
       <div class="grp"><span class="lbl">Prove</span><div class="chips" id="f-prove"></div></div>
       <label class="chk"><input type="checkbox" id="nopres"> Escludi bandi con preselettiva</label>
@@ -313,10 +315,12 @@ function compatMigliore(b, titoli) {
 }
 
 // ======================= stato =======================
-const DEFAULT = { q: "", regione: "Campania", categoria: "", prove: [], contratto: [], nopres: false,
+const DEFAULT = { q: "", regioni: ["Campania"], categoria: "", prove: [], contratto: [], nopres: false,
                   titoli: ["L-31"], verificare: true, ordina: "scadenza", scadmin: 0 };
 let F = Object.assign({}, DEFAULT, ls.get("filtri", {}));
 if (!Array.isArray(F.titoli)) F.titoli = [];
+if (!Array.isArray(F.regioni)) F.regioni = F.regione ? [F.regione] : [];   // vecchia versione: una sola regione
+delete F.regione;
 if (F.mialaurea) {    // vecchia versione della pagina: un solo titolo
   const c = normTitolo(F.mialaurea);
   if (c && !F.titoli.includes(c)) F.titoli = [c];
@@ -349,7 +353,7 @@ function passa(b, ignora) {
   const a = b.analisi;
   const g = giorniA(b.scadenza);
   if (g !== null && g < Number(F.scadmin || 0)) return false;
-  if (F.regione && ignora !== "regione" && b.regione !== F.regione) return false;
+  if (F.regioni.length && ignora !== "regione" && !F.regioni.includes(b.regione)) return false;
   if (F.categoria && ignora !== "categoria" && b.categoria !== F.categoria) return false;
   if (F.prove.length && ignora !== "prove" && !F.prove.includes(a ? a.prove.prove : "non_rilevato")) return false;
   if (F.nopres && a && a.prove.preselettiva) return false;
@@ -392,8 +396,11 @@ function chips(el, campo, opzioni, conteggi) {
     salva(); disegna();
   };
 }
+function valoriDi(chiave) {
+  return [...new Set(DATI.map(chiave).filter(Boolean))].sort((a, b) => a.localeCompare(b, "it"));
+}
 function selectOpzioni(el, campo, conteggi, tuttiLabel) {
-  const chiavi = Object.keys(conteggi).filter(Boolean).sort((a, b) => a.localeCompare(b, "it"));
+  const chiavi = valoriDi(b => b[campo]);
   if (F[campo] && !chiavi.includes(F[campo])) chiavi.unshift(F[campo]);
   el.innerHTML = `<option value="">${esc(tuttiLabel)}</option>` +
     chiavi.map(k => `<option value="${esc(k)}"${k === F[campo] ? " selected" : ""}>${esc(k)} (${conteggi[k] || 0})</option>`).join("");
@@ -471,7 +478,8 @@ function ordina(arr) {
 // ======================= notifiche =======================
 function codiceFiltri() {
   const p = [];
-  if (F.regione && REGIONI[F.regione]) p.push("R" + REGIONI[F.regione]);
+  const rc = F.regioni.map(r => REGIONI[r]).filter(Boolean);
+  if (rc.length) p.push("R" + rc.join(""));
   if (F.prove.length) p.push("P" + F.prove.map(x => CODICI_PROVE[x]).join(""));
   if (F.contratto.length) p.push("C" + F.contratto.map(x => CODICI_CONTR[x]).join(""));
   if (F.titoli.length) p.push("T" + F.titoli.map(c => DIPLOMI[c] ? (c === "DIP" ? "D" : "D" + c.slice(4)) : c.replace(/-/g, "")).join("-"));
@@ -480,7 +488,7 @@ function codiceFiltri() {
   return p.join("_");
 }
 function descriviFiltri() {
-  const p = [F.regione || "Tutte le regioni"];
+  const p = [F.regioni.join("/") || "Tutte le regioni"];
   if (F.prove.length) p.push(F.prove.map(x => ETICHETTE.prove[x]).join("/"));
   if (F.contratto.length) p.push(F.contratto.map(x => ETICHETTE.contratto[x]).join("/"));
   if (F.titoli.length) p.push(F.titoli.map(brevetitolo).join(", ") + (F.verificare ? " (anche da verificare)" : " (solo certi)"));
@@ -495,6 +503,8 @@ function disegnaNotifiche(nRis) {
   }
   let cod = codiceFiltri(), avviso = "";
   if (cod.length > 64) { avviso = "<br>⚠️ Troppi filtri per un solo link: togli qualche titolo."; cod = ""; }
+  const fuori = F.regioni.filter(r => !REGIONI[r]);
+  if (fuori.length) avviso += `<br>⚠️ ${esc(fuori.join(", "))} non vale per le notifiche.`;
   const extra = (F.q || F.categoria || Number(F.scadmin) > 0) ? "<br><i>Ricerca libera, tipo e scadenza non valgono per le notifiche.</i>" : "";
   const att = NOTIF.filtri ? `Notifiche attuali${NOTIF.pausa ? " (in pausa)" : ""}: ${esc(descriviFiltriSalvati(NOTIF.filtri))}` : "";
   el.innerHTML = `🔔 <b>Notifiche Telegram</b> per i concorsi <b>nuovi</b> con questi filtri:<br>${esc(descriviFiltri())} — oggi ${nRis} bandi.${extra}${avviso}
@@ -506,7 +516,14 @@ function disegnaNotifiche(nRis) {
 // ======================= ciclo principale =======================
 function disegna() {
   disegnaTitoli();
-  selectOpzioni($("regione"), "regione", conta("regione", b => b.regione), "Tutte le regioni");
+  const cr = conta("regione", b => b.regione);
+  $("regioni").innerHTML = F.regioni.length
+    ? F.regioni.map(r => `<button type="button" class="chip tit" data-k="${esc(r)}" title="Rimuovi">${esc(r)} <span class="n">${cr[r] || 0}</span><span class="x">✕</span></button>`).join("")
+    : `<span class="meta">Tutte le regioni</span>`;
+  $("addreg").innerHTML = `<option value="">+ Aggiungi regione…</option>` +
+    [...new Set(Object.keys(REGIONI).concat(valoriDi(b => b.regione)))].sort((x, y) => x.localeCompare(y, "it"))
+      .filter(r => !F.regioni.includes(r))
+      .map(r => `<option value="${esc(r)}">${esc(r)} (${cr[r] || 0})</option>`).join("");
   selectOpzioni($("categoria"), "categoria", conta("categoria", b => b.categoria), "Tutti i tipi");
   chips($("f-prove"), "prove", Object.entries(ETICHETTE.prove), conta("prove", b => b.analisi ? b.analisi.prove.prove : "non_rilevato"));
   const cc = conta("contratto", b => b.analisi ? b.analisi.contratto.contratto : "non_rilevato");
@@ -514,7 +531,7 @@ function disegna() {
   chips($("f-contratto"), "contratto", [["indeterminato", "Indeterminato"], ["determinato", "Determinato"], ["non_rilevato", "Da verificare"]], cc);
 
   const ris = ordina(DATI.filter(b => passa(b)));
-  const attivi = [F.regione, F.categoria, F.q, F.nopres, Number(F.scadmin) > 0, F.titoli.length].filter(Boolean).length + F.prove.length + F.contratto.length;
+  const attivi = [F.regioni.length, F.categoria, F.q, F.nopres, Number(F.scadmin) > 0, F.titoli.length].filter(Boolean).length + F.prove.length + F.contratto.length;
   $("nfiltri").textContent = attivi ? `(${attivi} attivi)` : "";
   $("conteggio").textContent = `${ris.length} bandi trovati`;
   const html = ris.slice(0, mostrati).map(scheda).join("");
@@ -535,7 +552,6 @@ function collega() {
     el.addEventListener(ev, () => { F[campo] = el.type === "checkbox" ? el.checked : el.value; salva(); disegna(); });
   };
   set("q", "q", "input");
-  set("regione", "regione");
   set("categoria", "categoria");
   set("nopres", "nopres");
   set("verificare", "verificare");
@@ -554,6 +570,14 @@ function collega() {
       if (cercaTitolo(v).cod && (DIPLOMI[v] || Object.keys(CLASSI).some(k => v.startsWith(k + " ")))) aggiungiTitolo(v);
     }
   });
+  $("addreg").onchange = () => {
+    const v = $("addreg").value;
+    if (v && !F.regioni.includes(v)) { F.regioni = F.regioni.concat(v); salva(); disegna(); }
+  };
+  $("regioni").onclick = e => {
+    const c = e.target.closest(".chip.tit"); if (!c) return;
+    F.regioni = F.regioni.filter(x => x !== c.dataset.k); salva(); disegna();
+  };
   $("titoli").onclick = e => {
     const c = e.target.closest(".chip.tit"); if (!c) return;
     F.titoli = F.titoli.filter(x => x !== c.dataset.k); salva(); disegna();
@@ -563,7 +587,7 @@ function collega() {
     F.titoli = F.titoli.concat(c.dataset.k); salva(); disegna();
   };
   $("reset").onclick = () => {
-    F = Object.assign({}, DEFAULT, { titoli: F.titoli, regione: "" });
+    F = Object.assign({}, DEFAULT, { titoli: F.titoli, regioni: F.regioni });
     ["q", "nopres", "verificare", "ordina", "scadmin"].forEach(id => {
       const el = $(id); if (el.type === "checkbox") el.checked = !!F[id]; else el.value = F[id];
     });
