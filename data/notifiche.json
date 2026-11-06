@@ -1,15 +1,35 @@
 {
  "filtri": {
-  "regioni": [],
-  "prove": [],
-  "contratto": [],
-  "titoli": [],
+  "regioni": [
+   "Campania"
+  ],
+  "prove": [
+   "solo_scritto"
+  ],
+  "contratto": [
+   "indeterminato"
+  ],
+  "titoli": [
+   "L-31",
+   "DIP",
+   "DIP-INF",
+   "L-9",
+   "LM-22"
+  ],
+  "idoneita": [
+   "FINFL",
+   "AINFC"
+  ],
+  "tipi": [
+   "C",
+   "G"
+  ],
   "verificare": true,
   "nopres": false
  },
  "pausa": false,
- "offset": 689769957,
+ "offset": 689769959,
  "visti_extra": [],
  "bot": "PAconco_BOT",
- "aggiornato": "2026-11-06T13:13+00:00"
+ "aggiornato": "2026-11-06T14:59+00:00"
 }
