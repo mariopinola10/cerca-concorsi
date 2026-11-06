@@ -32,6 +32,24 @@ Niente server e niente costi: i bandi già analizzati restano in `data/cache.jso
 
 Su telefono: apri la pagina e usa *Aggiungi a schermata Home* per averla come app.
 
+## Notifiche (Telegram e/o email)
+
+`notifica.py` gira dopo ogni aggiornamento e segnala **solo i bandi nuovi** che rispettano i filtri `NOTIFICA_*` scritti nel workflow (default: Campania, compatibili con L-31). Al primo avvio manda solo un messaggio di conferma.
+
+I canali si attivano aggiungendo i secret in **Settings → Secrets and variables → Actions → New repository secret**:
+
+**Telegram**
+1. Su Telegram apri **@BotFather** → `/newbot` → scegli nome e username → copia il **token**.
+2. Apri il tuo nuovo bot e premi **Avvia** (o scrivigli "ciao").
+3. Nel browser apri `https://api.telegram.org/bot<TOKEN>/getUpdates` e copia il numero in `"chat":{"id": ...}`.
+4. Crea i secret `TELEGRAM_TOKEN` e `TELEGRAM_CHAT_ID`.
+
+**Email (Gmail)**
+1. Attiva la verifica in due passaggi sull'account Google, poi crea una **password per le app** (myaccount.google.com → Sicurezza → Password per le app).
+2. Crea i secret `EMAIL_USER` (indirizzo Gmail), `EMAIL_PASSWORD` (la password per le app, 16 caratteri) e `EMAIL_TO` (destinatario; se manca usa `EMAIL_USER`).
+
+Per cambiare i filtri modifica le righe `NOTIFICA_*` in `.github/workflows/aggiorna.yml`.
+
 ## Se qualcosa non va
 
 - **Il workflow fallisce con "FONTE NON DISPONIBILE"**: inPA non risponde o ha cambiato l'API. Avvia il workflow a mano con *probe* = `si`: nel log trovi un record grezzo da confrontare con i campi usati in `aggiorna.py` (`titolo`, `sedi`, `dataScadenza`, `tipoProcedura`, `allegatoMediaId`, `allegati[].mediaId`).
