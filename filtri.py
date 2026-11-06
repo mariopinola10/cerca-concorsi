@@ -82,7 +82,8 @@ RE_GRAD = re.compile(r"idone[io]|utilizz\w*\s+(?:di\s+)?(?:idonei\s+)?(?:delle\s
                      r"scorriment\w*\s+(?:di\s+|delle\s+)?graduatori|"
                      r"graduatori\w*\s+(?:\S+\s+){0,6}(?:da|di)\s+altr[ie]\s+(?:enti|amministrazioni|pp\.?\s*aa)")
 LIV_PROF = [("D", re.compile(r"dirigent")),
-            ("F", re.compile(r"funzionari|direttiv|specialist|\bcat(?:egoria)?\.?\s*d\b|area\s+(?:dei\s+)?funzionari")),
+            ("F", re.compile(r"funzionari|direttiv|specialist|assistent[ei]\s+social|\bcat(?:egoria)?\.?\s*d\b|area\s+(?:dei\s+)?funzionari")),
+            ("A", re.compile(r"assistent[ei](?!\s+social)|area\s+(?:degli\s+)?assistenti")),
             ("I", re.compile(r"\bistr(?:\.|uttor)|\bcat(?:egoria)?\.?\s*c\b|area\s+(?:degli\s+)?istruttori|agent[ei]\s+di\s+polizia")),
             ("O", re.compile(r"operator|esecutor|collaborator|\bcat(?:egoria)?\.?\s*b\b|area\s+(?:degli\s+)?operatori"))]
 AREE_PROF = {"INF": ("informatico", re.compile(r"informatic|sistemi\s+informativ|\bict\b|digital|programmator|analista")),
@@ -93,7 +94,35 @@ AREE_PROF = {"INF": ("informatico", re.compile(r"informatic|sistemi\s+informativ
              "SOC": ("sociale/educativo", re.compile(r"social|educator|pedagog")),
              "CUL": ("culturale/biblioteca", re.compile(r"bibliotec|cultural|archivist|museal")),
              "COM": ("comunicazione", re.compile(r"comunicazion|giornalist|ufficio\s+stampa"))}
-NOMI_LIV = {"D": "Dirigente", "F": "Funzionario", "I": "Istruttore", "O": "Operatore"}
+NOMI_LIV = {"D": "Dirigente", "F": "Funzionario", "A": "Assistente", "I": "Istruttore", "O": "Operatore"}
+LIV_EQ = {"A": "I"}   # Assistenti (Funzioni Centrali) = Istruttori (Funzioni Locali)
+COMPARTI = {"L": "Funzioni Locali", "C": "Funzioni Centrali", "S": "Sanità", "U": "Istruzione e ricerca"}
+# solo frasi che RESTRINGONO gli enti di provenienza ("enti che applicano il CCNL...", "enti del comparto...")
+RE_COMPARTO = re.compile(
+    r"(?:enti|amministrazioni|pubbliche\s+amministrazioni)[^.;]{0,50}?"
+    r"(?:che\s+applican\w*|del(?:lo\s+stesso|\s+medesimo)?\s+comparto|appartenent\w*\s+al(?:lo\s+stesso)?\s+comparto|soggett\w*\s+al)"
+    r"[^.;]{0,40}?(funzioni\s+locali|enti\s+locali|regioni\s+e\s+(?:delle\s+)?autonomie\s+locali|funzioni\s+centrali|"
+    r"sanit[aà]|istruzione\s+e\s+(?:della\s+)?ricerca)")
+TIPI = {"C": "Concorsi", "G": "Manifestazioni d'interesse (idonei)", "M": "Mobilità", "A": "Altri avvisi"}
+
+
+def comparto_da_testo(t: str) -> str:
+    m = RE_COMPARTO.search(t.lower())
+    if not m:
+        return ""
+    x = m.group(1)
+    return "L" if ("local" in x) else "C" if "centrali" in x else "S" if x.startswith("sanit") else "U"
+
+
+def tipo(b: dict) -> str:
+    if graduatoria(b):
+        return "G"
+    cat = (b.get("categoria") or "").lower()
+    if "mobilit" in cat:
+        return "M"
+    if not cat or "concors" in cat:
+        return "C"
+    return "A"
 
 
 def graduatoria(b: dict) -> dict | None:
@@ -103,24 +132,33 @@ def graduatoria(b: dict) -> dict | None:
     liv = next((k for k, r in LIV_PROF if r.search(t)), "")
     aree = [k for k, (_, r) in AREE_PROF.items() if r.search(t)]
     nome = f"{NOMI_LIV.get(liv, 'Profilo')} {'/'.join(AREE_PROF[a][0] for a in aree)}".strip()
-    return {"liv": liv, "aree": aree, "nome": nome}
+    comp = ((b.get("analisi") or {}).get("comparto") or "") or comparto_da_testo(t)
+    return {"liv": liv, "aree": aree, "nome": nome, "comparto": comp}
 
 
 def nome_idoneita(c: str) -> str:
-    return f"{NOMI_LIV.get(c[:1], '')} {AREE_PROF.get(c[1:], (c[1:],))[0]}".strip()
+    """codice idoneita': livello(1) + area(3) + comparto(1, facoltativo) es. AINFC"""
+    comp = COMPARTI.get(c[4:5], "")
+    return f"{NOMI_LIV.get(c[:1], '')} {AREE_PROF.get(c[1:4], (c[1:4],))[0]}".strip() + (f" ({comp})" if comp else "")
 
 
 def compat_idoneita(g: dict, idon: list[str]) -> tuple[str, str]:
     best = ("no", "")
     for c in idon:
-        liv, area = c[:1], c[1:]
-        stessa_area, stesso_liv = area in g["aree"], g["liv"] == liv
+        liv, area, comp = LIV_EQ.get(c[:1], c[:1]), c[1:4], c[4:5]
+        gliv = LIV_EQ.get(g["liv"], g["liv"])
+        stessa_area, stesso_liv = area in g["aree"], gliv == liv
         if stessa_area and stesso_liv:
             k = "si"
         elif (stessa_area and not g["liv"]) or (stesso_liv and not g["aree"]) or (stessa_area and g["liv"] and not stesso_liv):
             k = "forse"
         else:
             k = "no"
+        if k != "no" and g.get("comparto"):        # l'avviso accetta solo graduatorie di un comparto
+            if not comp:
+                k = "forse"
+            elif comp != g["comparto"]:
+                k = "no"
         if RANGO[k] > RANGO[best[0]]:
             best = (k, c)
     return best
@@ -229,8 +267,7 @@ def passa(b: dict, f: dict) -> bool:
         c = a["contratto"]["contratto"]
         if not (c in f["contratto"] or (c == "entrambi" and {"indeterminato", "determinato"} & set(f["contratto"]))):
             return False
-    g = graduatoria(b)
-    if g and f.get("grad") is False:
+    if f.get("tipi") and tipo(b) not in f["tipi"]:
         return False
     v = valuta(b, f)
     if v:
@@ -251,15 +288,15 @@ def descrivi_filtri(f: dict) -> str:
                      + (" (anche da verificare)" if f.get("verificare", True) else " (solo certi)"))
     if f.get("idoneita"):
         parti.append("idoneo " + ", ".join(nome_idoneita(c) for c in f["idoneita"]))
-    if f.get("grad") is False:
-        parti.append("senza avvisi per idonei")
+    if f.get("tipi"):
+        parti.append("/".join(TIPI.get(x, x) for x in f["tipi"]))
     if f.get("nopres"):
         parti.append("senza preselettiva")
     return " · ".join(parti)
 
 
 def decodifica(codice: str) -> dict | None:
-    f = {"regioni": [], "prove": [], "contratto": [], "titoli": [], "idoneita": [], "grad": True, "verificare": True, "nopres": False}
+    f = {"regioni": [], "prove": [], "contratto": [], "titoli": [], "idoneita": [], "tipi": [], "verificare": True, "nopres": False}
     inv_reg = {v: k for k, v in REGIONI.items()}
     inv_pro = {v: k for k, v in CODICI_PROVE.items()}
     inv_con = {v: k for k, v in CODICI_CONTR.items()}
@@ -283,9 +320,12 @@ def decodifica(codice: str) -> dict | None:
                         tit.append(norm_titolo(x))
                 f["titoli"] = [t for t in tit if t in DIPLOMI or livello_titolo(t)]
             elif k == "I":
-                f["idoneita"] = [x for x in v.split("-") if x[:1] in NOMI_LIV and x[1:] in AREE_PROF]
-            elif tok == "G0":
-                f["grad"] = False
+                f["idoneita"] = [x for x in v.split("-") if x[:1] in NOMI_LIV and x[1:4] in AREE_PROF
+                                 and (len(x) == 4 or x[4:5] in COMPARTI)]
+            elif k == "Y":
+                f["tipi"] = [x for x in v if x in TIPI]
+            elif tok == "G0":                       # vecchio formato: "senza avvisi per idonei"
+                f["tipi"] = ["C", "M", "A"]
             elif tok == "VS":
                 f["verificare"] = False
             elif tok == "X":
@@ -350,7 +390,7 @@ def scheda(b: dict, f: dict) -> dict:
     a = b["analisi"]
     p, c = a["prove"], a["contratto"]
     g = graduatoria(b)
-    tag = ([f"Idonei in graduatoria · {g['nome']}"] if g else []) + [ETICHETTE_PROVE.get(p["prove"], p["prove"]) + (" (incerto)" if p["conf"] == "bassa" and p["prove"] != "non_rilevato" else "")]
+    tag = ([f"Idonei in graduatoria · {g['nome']}" + (f" ({COMPARTI[g['comparto']]})" if g.get("comparto") else "")] if g else []) + [ETICHETTE_PROVE.get(p["prove"], p["prove"]) + (" (incerto)" if p["conf"] == "bassa" and p["prove"] != "non_rilevato" else "")]
     if p["preselettiva"]:
         tag.append("preselettiva")
     tag.append(ETICHETTE_CONTR.get(c["contratto"], c["contratto"]))

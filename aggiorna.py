@@ -451,7 +451,13 @@ def analizza(cli: Client, raw: dict) -> dict:
     intest = normalizza(f"{rec['titolo']} . {rec['profilo']}")
     t = normalizza(f"{rec['titolo']} . {rec['profilo']} . {testo_det} . {testo_pdf_tot}")
 
+    comparto = ""
+    m = re.search(r"graduatori", t)
+    if m:
+        from filtri import comparto_da_testo
+        comparto = comparto_da_testo(t[:20000])
     rec["analisi"] = {
+        "comparto": comparto,
         "prove": classifica_prove(t, rec["tipo_procedura"], ha_pdf),
         "contratto": classifica_contratto(intest, t),
         "titolo": classifica_titolo(intest, t),

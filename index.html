@@ -108,18 +108,21 @@
         <div class="chips" id="rapidi" style="margin-top:8px"></div>
         <div class="msg" id="msgtit"></div>
         <label class="chk"><input type="checkbox" id="verificare"> Mostra anche i bandi da verificare</label>
-        <div class="hint">Con almeno un titolo vedi solo i bandi a cui puoi accedere con uno di essi.</div>
+        <div class="hint">Valgono per i <b>concorsi</b>: con almeno un titolo vedi solo quelli a cui puoi accedere con uno di essi.</div>
       </div>
 
       <div class="grp"><span class="lbl">Le mie idoneità in graduatoria</span>
         <div class="chips" id="idoneita"></div>
-        <div class="addrow">
-          <select id="idliv" style="flex:1.2;min-width:0"><option value="F">Funzionario</option><option value="I">Istruttore</option><option value="O">Operatore</option><option value="D">Dirigente</option></select>
-          <select id="idarea" style="flex:1.2;min-width:0"></select>
-          <button class="btn" id="addid" type="button">Aggiungi</button>
+        <div class="row2" style="margin-top:8px">
+          <select id="idliv"><option value="F">Funzionario</option><option value="A">Assistente</option><option value="I">Istruttore</option><option value="O">Operatore</option><option value="D">Dirigente</option></select>
+          <select id="idarea"></select>
         </div>
-        <label class="chk"><input type="checkbox" id="grad"> Mostra gli avvisi per idonei in graduatorie di altri enti</label>
-        <div class="hint">Per questi avvisi conta l'idoneità nel profilo richiesto, non il titolo di studio.</div>
+        <div class="row2" style="margin-top:8px">
+          <select id="idcomp"><option value="">Comparto: non so</option><option value="L">Funzioni Locali (Comuni, Regioni…)</option><option value="C">Funzioni Centrali (Ministeri, Agenzie, INPS…)</option><option value="S">Sanità</option><option value="U">Istruzione e ricerca</option></select>
+          <input class="small" type="url" id="idlink" placeholder="Link al bando (facoltativo)" autocomplete="off">
+        </div>
+        <button class="btn" id="addid" type="button" style="width:100%;margin-top:8px">Aggiungi idoneità</button>
+        <div class="hint">Valgono per le <b>manifestazioni d'interesse</b> (utilizzo di idonei in graduatorie di altri enti): lì conta l'idoneità nel profilo richiesto, non il titolo di studio. Assistente (Funzioni Centrali) e Istruttore (Funzioni Locali) sono considerati livelli equivalenti.</div>
       </div>
 
       <div class="grp"><span class="lbl">Regioni</span>
@@ -127,7 +130,7 @@
         <select id="addreg" style="margin-top:8px"></select>
       </div>
 
-      <div class="grp"><label for="categoria">Tipo</label><select id="categoria"></select></div>
+      <div class="grp"><span class="lbl">Tipo di avviso</span><div class="chips" id="f-tipi"></div></div>
 
       <div class="grp"><span class="lbl">Prove</span><div class="chips" id="f-prove"></div></div>
       <label class="chk"><input type="checkbox" id="nopres"> Escludi bandi con preselettiva</label>
@@ -248,7 +251,8 @@ const LAUREA_DIPLOMA = { informatica: ["informatica"], ingegneria: ["informatica
 const LIV = { nessuno: 0, diploma: 1, triennale: 2, magistrale: 3 };
 // ---- avvisi per idonei in graduatorie di altri enti (riconosciuti dal titolo; stessa logica in filtri.py)
 const RE_GRAD = /idone[io]|utilizz\w*\s+(?:di\s+)?(?:idonei\s+)?(?:delle\s+|di\s+)?graduatori|scorriment\w*\s+(?:di\s+|delle\s+)?graduatori|graduatori\w*\s+(?:\S+\s+){0,6}(?:da|di)\s+altr[ie]\s+(?:enti|amministrazioni|pp\.?\s*aa)/;
-const LIV_PROF = [["D", /dirigent/], ["F", /funzionari|direttiv|specialist|\bcat(?:egoria)?\.?\s*d\b|area\s+(?:dei\s+)?funzionari/],
+const LIV_PROF = [["D", /dirigent/], ["F", /funzionari|direttiv|specialist|assistent[ei]\s+social|\bcat(?:egoria)?\.?\s*d\b|area\s+(?:dei\s+)?funzionari/],
+  ["A", /assistent[ei](?!\s+social)|area\s+(?:degli\s+)?assistenti/],
   ["I", /\bistr(?:\.|uttor)|\bcat(?:egoria)?\.?\s*c\b|area\s+(?:degli\s+)?istruttori|agent[ei]\s+di\s+polizia/],
   ["O", /operator|esecutor|collaborator|\bcat(?:egoria)?\.?\s*b\b|area\s+(?:degli\s+)?operatori/]];
 const AREE_PROF = { INF: ["informatico", /informatic|sistemi\s+informativ|\bict\b|digital|programmator|analista/],
@@ -256,22 +260,49 @@ const AREE_PROF = { INF: ["informatico", /informatic|sistemi\s+informativ|\bict\
   TEC: ["tecnico", /tecnic|geometr|ingegner|architett|lavori\s+pubblici/], VIG: ["vigilanza", /vigilanza|polizia\s+locale|agent[ei]\s+di\s+p/],
   SOC: ["sociale/educativo", /social|educator|pedagog/], CUL: ["culturale/biblioteca", /bibliotec|cultural|archivist|museal/],
   COM: ["comunicazione", /comunicazion|giornalist|ufficio\s+stampa/] };
-const NOMI_LIV = { D: "Dirigente", F: "Funzionario", I: "Istruttore", O: "Operatore" };
+const NOMI_LIV = { D: "Dirigente", F: "Funzionario", A: "Assistente", I: "Istruttore", O: "Operatore" };
+const LIV_EQ = { A: "I" };   // Assistenti (Funzioni Centrali) = Istruttori (Funzioni Locali)
+const COMPARTI = { L: "Funzioni Locali", C: "Funzioni Centrali", S: "Sanità", U: "Istruzione e ricerca" };
+const RE_COMPARTO = /(?:enti|amministrazioni|pubbliche\s+amministrazioni)[^.;]{0,50}?(?:che\s+applican\w*|del(?:lo\s+stesso|\s+medesimo)?\s+comparto|appartenent\w*\s+al(?:lo\s+stesso)?\s+comparto|soggett\w*\s+al)[^.;]{0,40}?(funzioni\s+locali|enti\s+locali|regioni\s+e\s+(?:delle\s+)?autonomie\s+locali|funzioni\s+centrali|sanit[aà]|istruzione\s+e\s+(?:della\s+)?ricerca)/;
+const TIPI = { C: "Concorsi", G: "Manifestazioni d'interesse (idonei)", M: "Mobilità", A: "Altri avvisi" };
+function compartoDaTesto(t) {
+  const m = String(t).toLowerCase().match(RE_COMPARTO);
+  if (!m) return "";
+  const x = m[1];
+  return x.includes("local") ? "L" : x.includes("centrali") ? "C" : x.startsWith("sanit") ? "S" : "U";
+}
+function tipo(b) {
+  if (graduatoria(b)) return "G";
+  const cat = (b.categoria || "").toLowerCase();
+  if (cat.includes("mobilit")) return "M";
+  if (!cat || cat.includes("concors")) return "C";
+  return "A";
+}
 function graduatoria(b) {
   const t = (b.titolo + " . " + b.profilo).toLowerCase();
   if (!RE_GRAD.test(t)) return null;
   const liv = (LIV_PROF.find(([, r]) => r.test(t)) || [""])[0];
   const aree = Object.keys(AREE_PROF).filter(k => AREE_PROF[k][1].test(t));
   const nome = ((NOMI_LIV[liv] || "Profilo") + " " + aree.map(a => AREE_PROF[a][0]).join("/")).trim();
-  return { liv, aree, nome };
+  const comparto = (b.analisi && b.analisi.comparto) || compartoDaTesto(t);
+  return { liv, aree, nome, comparto };
 }
-function nomeIdoneita(c) { return (NOMI_LIV[c[0]] || "") + " " + (AREE_PROF[c.slice(1)] || [c.slice(1)])[0]; }
+// codice idoneità: livello(1) + area(3) + comparto(1, facoltativo), es. AINFC
+function nomeIdoneita(c) {
+  const comp = COMPARTI[c.slice(4, 5)];
+  return ((NOMI_LIV[c[0]] || "") + " " + (AREE_PROF[c.slice(1, 4)] || [c.slice(1, 4)])[0]).trim() + (comp ? ` (${comp})` : "");
+}
 function compatIdoneita(g, idon) {
   let best = ["no", ""];
   for (const c of idon) {
-    const liv = c[0], area = c.slice(1);
-    const stessaArea = g.aree.includes(area), stessoLiv = g.liv === liv;
-    const k = (stessaArea && stessoLiv) ? "si" : ((stessaArea && !g.liv) || (stessoLiv && !g.aree.length) || (stessaArea && g.liv && !stessoLiv)) ? "forse" : "no";
+    const liv = LIV_EQ[c[0]] || c[0], area = c.slice(1, 4), comp = c.slice(4, 5);
+    const gliv = LIV_EQ[g.liv] || g.liv;
+    const stessaArea = g.aree.includes(area), stessoLiv = gliv === liv;
+    let k = (stessaArea && stessoLiv) ? "si" : ((stessaArea && !g.liv) || (stessoLiv && !g.aree.length) || (stessaArea && g.liv && !stessoLiv)) ? "forse" : "no";
+    if (k !== "no" && g.comparto) {          // l'avviso accetta solo graduatorie di un comparto
+      if (!comp) k = "forse";
+      else if (comp !== g.comparto) k = "no";
+    }
     if (RANGO[k] > RANGO[best[0]]) best = [k, c];
   }
   return best;
@@ -280,9 +311,10 @@ function compatIdoneita(g, idon) {
 function valuta(b) {
   const g = graduatoria(b);
   if (g) {
-    if (!F.idoneita.length) return ["?", "Serve idoneità: " + g.nome];
+    if (!F.idoneita.length) return ["?", "Serve idoneità: " + g.nome + (g.comparto ? ` (${COMPARTI[g.comparto]})` : "")];
     const [k, c] = compatIdoneita(g, F.idoneita);
-    return [k, k === "si" ? "✓ idoneo " + nomeIdoneita(c) : k === "forse" ? "Da verificare: idoneità " + g.nome : "Serve idoneità: " + g.nome];
+    const req = g.nome + (g.comparto ? ` (${COMPARTI[g.comparto]})` : "");
+    return [k, k === "si" ? "✓ idoneo " + nomeIdoneita(c) : k === "forse" ? "Da verificare: idoneità " + req : "Serve idoneità: " + req];
   }
   if (!F.titoli.length) return null;
   const [k, tit] = compatMigliore(b, F.titoli);
@@ -368,11 +400,14 @@ function compatMigliore(b, titoli) {
 }
 
 // ======================= stato =======================
-const DEFAULT = { q: "", regioni: ["Campania"], categoria: "", prove: [], contratto: [], nopres: false,
-                  titoli: ["L-31"], verificare: true, idoneita: [], grad: true, ordina: "scadenza", scadmin: 0 };
+const DEFAULT = { q: "", regioni: ["Campania"], tipi: [], prove: [], contratto: [], nopres: false,
+                  titoli: ["L-31"], verificare: true, idoneita: [], idlink: {}, ordina: "scadenza", scadmin: 0 };
 let F = Object.assign({}, DEFAULT, ls.get("filtri", {}));
 if (!Array.isArray(F.titoli)) F.titoli = [];
 if (!Array.isArray(F.idoneita)) F.idoneita = [];
+if (!Array.isArray(F.tipi)) F.tipi = F.grad === false ? ["C", "M", "A"] : [];
+if (!F.idlink || typeof F.idlink !== "object") F.idlink = {};
+delete F.grad; delete F.categoria;
 if (!Array.isArray(F.regioni)) F.regioni = F.regione ? [F.regione] : [];   // vecchia versione: una sola regione
 delete F.regione;
 if (F.mialaurea) {    // vecchia versione della pagina: un solo titolo
@@ -408,7 +443,7 @@ function passa(b, ignora) {
   const g = giorniA(b.scadenza);
   if (g !== null && g < Number(F.scadmin || 0)) return false;
   if (F.regioni.length && ignora !== "regione" && !F.regioni.includes(b.regione)) return false;
-  if (F.categoria && ignora !== "categoria" && b.categoria !== F.categoria) return false;
+  if (F.tipi.length && ignora !== "tipi" && !F.tipi.includes(tipo(b))) return false;
   if (F.prove.length && ignora !== "prove" && !F.prove.includes(a ? a.prove.prove : "non_rilevato")) return false;
   if (F.nopres && a && a.prove.preselettiva) return false;
   if (F.contratto.length && ignora !== "contratto") {
@@ -416,7 +451,6 @@ function passa(b, ignora) {
     if (!(F.contratto.includes(v) || (v === "entrambi" && F.contratto.some(x => x === "indeterminato" || x === "determinato")))) return false;
   }
   const gr = graduatoria(b);
-  if (gr && !F.grad) return false;
   if (gr || F.titoli.length) {
     const [k] = valuta(b);
     if (k === "no" || (!F.verificare && k !== "si")) return false;
@@ -463,7 +497,7 @@ function selectOpzioni(el, campo, conteggi, tuttiLabel) {
 }
 function disegnaIdoneita() {
   $("idoneita").innerHTML = F.idoneita.length
-    ? F.idoneita.map(c => `<button type="button" class="chip tit" data-k="${esc(c)}" title="Rimuovi">${esc(nomeIdoneita(c))}<span class="x">✕</span></button>`).join("")
+    ? F.idoneita.map(c => `<span style="display:inline-flex;align-items:center;gap:4px"><button type="button" class="chip tit" data-k="${esc(c)}" title="Rimuovi">${esc(nomeIdoneita(c))}<span class="x">✕</span></button>${F.idlink[c] ? `<a href="${esc(F.idlink[c])}" target="_blank" rel="noopener" title="Bando di idoneità" style="text-decoration:none">🔗</a>` : ""}</span>`).join("")
     : `<span class="meta">Nessuna: gli avvisi per idonei restano «da verificare».</span>`;
 }
 function disegnaTitoli() {
@@ -490,7 +524,7 @@ function scheda(b) {
   if (a) {
     const p = a.prove, c = a.contratto, t = a.titolo;
     const gr = graduatoria(b);
-    if (gr) bad += badge("p", "Idonei in graduatoria · " + gr.nome);
+    if (gr) bad += badge("p", "Idonei in graduatoria · " + gr.nome + (gr.comparto ? ` (${COMPARTI[gr.comparto]})` : ""));
     bad += badge("p", p.prove === "non_rilevato" ? "Prove da verificare" : (ETICHETTE.prove[p.prove] || p.prove), p.conf === "bassa" && p.prove !== "non_rilevato");
     if (p.preselettiva) bad += badge("warn", "Preselettiva");
     if (p.pratica) bad += badge("", "Prova pratica");
@@ -545,7 +579,7 @@ function codiceFiltri() {
   if (F.contratto.length) p.push("C" + F.contratto.map(x => CODICI_CONTR[x]).join(""));
   if (F.titoli.length) p.push("T" + F.titoli.map(c => DIPLOMI[c] ? (c === "DIP" ? "D" : "D" + c.slice(4)) : c.replace(/-/g, "")).join("-"));
   if (F.idoneita.length) p.push("I" + F.idoneita.join("-"));
-  if (!F.grad) p.push("G0");
+  if (F.tipi.length) p.push("Y" + F.tipi.join(""));
   if (!F.verificare) p.push("VS");
   if (F.nopres) p.push("X");
   return p.join("_");
@@ -556,7 +590,7 @@ function descriviFiltri() {
   if (F.contratto.length) p.push(F.contratto.map(x => ETICHETTE.contratto[x]).join("/"));
   if (F.titoli.length) p.push(F.titoli.map(brevetitolo).join(", ") + (F.verificare ? " (anche da verificare)" : " (solo certi)"));
   if (F.idoneita.length) p.push("idoneo " + F.idoneita.map(nomeIdoneita).join(", "));
-  if (!F.grad) p.push("senza avvisi per idonei");
+  if (F.tipi.length) p.push(F.tipi.map(x => TIPI[x]).join("/"));
   if (F.nopres) p.push("senza preselettiva");
   return p.join(" · ");
 }
@@ -570,7 +604,7 @@ function disegnaNotifiche(nRis) {
   if (cod.length > 64) { avviso = "<br>⚠️ Troppi filtri per un solo link: togli qualche titolo."; cod = ""; }
   const fuori = F.regioni.filter(r => !REGIONI[r]);
   if (fuori.length) avviso += `<br>⚠️ ${esc(fuori.join(", "))} non vale per le notifiche.`;
-  const extra = (F.q || F.categoria || Number(F.scadmin) > 0) ? "<br><i>Ricerca libera, tipo e scadenza non valgono per le notifiche.</i>" : "";
+  const extra = (F.q || Number(F.scadmin) > 0) ? "<br><i>Ricerca libera e scadenza non valgono per le notifiche.</i>" : "";
   const att = NOTIF.filtri ? `Notifiche attuali${NOTIF.pausa ? " (in pausa)" : ""}: ${esc(descriviFiltriSalvati(NOTIF.filtri))}` : "";
   el.innerHTML = `🔔 <b>Notifiche Telegram</b> per i concorsi <b>nuovi</b> con questi filtri:<br>${esc(descriviFiltri())} — oggi ${nRis} bandi.${extra}${avviso}
     ${cod ? `<a class="btn" href="https://t.me/${esc(NOTIF.bot)}?start=${encodeURIComponent(cod)}" target="_blank" rel="noopener">🔔 Usa questi filtri per le notifiche</a>
@@ -590,14 +624,14 @@ function disegna() {
     [...new Set(Object.keys(REGIONI).concat(valoriDi(b => b.regione)))].sort((x, y) => x.localeCompare(y, "it"))
       .filter(r => !F.regioni.includes(r))
       .map(r => `<option value="${esc(r)}">${esc(r)} (${cr[r] || 0})</option>`).join("");
-  selectOpzioni($("categoria"), "categoria", conta("categoria", b => b.categoria), "Tutti i tipi");
+  chips($("f-tipi"), "tipi", Object.entries(TIPI), conta("tipi", tipo));
   chips($("f-prove"), "prove", Object.entries(ETICHETTE.prove), conta("prove", b => b.analisi ? b.analisi.prove.prove : "non_rilevato"));
   const cc = conta("contratto", b => b.analisi ? b.analisi.contratto.contratto : "non_rilevato");
   if (cc.entrambi) { cc.indeterminato = (cc.indeterminato || 0) + cc.entrambi; cc.determinato = (cc.determinato || 0) + cc.entrambi; }
   chips($("f-contratto"), "contratto", [["indeterminato", "Indeterminato"], ["determinato", "Determinato"], ["non_rilevato", "Da verificare"]], cc);
 
   const ris = ordina(DATI.filter(b => passa(b)));
-  const attivi = [F.regioni.length, F.categoria, F.q, F.nopres, Number(F.scadmin) > 0, F.titoli.length].filter(Boolean).length + F.prove.length + F.contratto.length;
+  const attivi = [F.regioni.length, F.tipi.length, F.q, F.nopres, Number(F.scadmin) > 0, F.titoli.length].filter(Boolean).length + F.prove.length + F.contratto.length;
   $("nfiltri").textContent = attivi ? `(${attivi} attivi)` : "";
   $("conteggio").textContent = `${ris.length} bandi trovati`;
   const html = ris.slice(0, mostrati).map(scheda).join("");
@@ -618,19 +652,23 @@ function collega() {
     el.addEventListener(ev, () => { F[campo] = el.type === "checkbox" ? el.checked : el.value; salva(); disegna(); });
   };
   set("q", "q", "input");
-  set("categoria", "categoria");
   set("nopres", "nopres");
   set("verificare", "verificare");
-  set("grad", "grad");
   $("idarea").innerHTML = Object.entries(AREE_PROF).map(([k, v]) => `<option value="${k}">${esc(v[0])}</option>`).join("");
   $("idliv").value = "F"; $("idarea").value = "INF";
   $("addid").onclick = () => {
-    const c = $("idliv").value + $("idarea").value;
-    if (!F.idoneita.includes(c)) { F.idoneita = F.idoneita.concat(c); salva(); disegna(); }
+    const c = $("idliv").value + $("idarea").value + $("idcomp").value;
+    const link = $("idlink").value.trim();
+    if (link && /^https?:\/\//.test(link)) F.idlink = Object.assign({}, F.idlink, { [c]: link });
+    if (!F.idoneita.includes(c)) F.idoneita = F.idoneita.concat(c);
+    $("idlink").value = "";
+    salva(); disegna();
   };
   $("idoneita").onclick = e => {
     const c = e.target.closest(".chip.tit"); if (!c) return;
-    F.idoneita = F.idoneita.filter(x => x !== c.dataset.k); salva(); disegna();
+    F.idoneita = F.idoneita.filter(x => x !== c.dataset.k);
+    const l = Object.assign({}, F.idlink); delete l[c.dataset.k]; F.idlink = l;
+    salva(); disegna();
   };
   set("ordina", "ordina");
   set("scadmin", "scadmin");
@@ -664,8 +702,8 @@ function collega() {
     F.titoli = F.titoli.concat(c.dataset.k); salva(); disegna();
   };
   $("reset").onclick = () => {
-    F = Object.assign({}, DEFAULT, { titoli: F.titoli, regioni: F.regioni, idoneita: F.idoneita });
-    ["q", "nopres", "verificare", "grad", "ordina", "scadmin"].forEach(id => {
+    F = Object.assign({}, DEFAULT, { titoli: F.titoli, regioni: F.regioni, idoneita: F.idoneita, idlink: F.idlink });
+    ["q", "nopres", "verificare", "ordina", "scadmin"].forEach(id => {
       const el = $(id); if (el.type === "checkbox") el.checked = !!F[id]; else el.value = F[id];
     });
     salva(); disegna();
@@ -680,7 +718,7 @@ function descriviFiltriSalvati(f) {
   if ((f.contratto || []).length) p.push(f.contratto.map(x => ETICHETTE.contratto[x] || x).join("/"));
   if ((f.titoli || []).length) p.push(f.titoli.map(brevetitolo).join(", ") + (f.verificare === false ? " (solo certi)" : " (anche da verificare)"));
   if ((f.idoneita || []).length) p.push("idoneo " + f.idoneita.map(nomeIdoneita).join(", "));
-  if (f.grad === false) p.push("senza avvisi per idonei");
+  if ((f.tipi || []).length) p.push(f.tipi.map(x => TIPI[x] || x).join("/"));
   if (f.nopres) p.push("senza preselettiva");
   return p.join(" · ");
 }
