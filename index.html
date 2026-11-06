@@ -265,7 +265,7 @@ const NOMI_LIV = { D: "Dirigente", F: "Funzionario", A: "Assistente", I: "Istrut
 const LIV_EQ = { A: "I" };   // Assistenti (Funzioni Centrali) = Istruttori (Funzioni Locali)
 const COMPARTI = { L: "Funzioni Locali", C: "Funzioni Centrali", S: "Sanità", U: "Istruzione e ricerca" };
 const RE_COMPARTO = /(?:enti|amministrazioni|pubbliche\s+amministrazioni)[^.;]{0,50}?(?:che\s+applican\w*|del(?:lo\s+stesso|\s+medesimo)?\s+comparto|appartenent\w*\s+al(?:lo\s+stesso)?\s+comparto|soggett\w*\s+al)[^.;]{0,40}?(funzioni\s+locali|enti\s+locali|regioni\s+e\s+(?:delle\s+)?autonomie\s+locali|funzioni\s+centrali|sanit[aà]|istruzione\s+e\s+(?:della\s+)?ricerca)/;
-const TIPI = { C: "Concorsi", G: "Manifestazioni d'interesse (idonei)", I: "Interpelli (elenchi idonei)", M: "Mobilità", A: "Altri avvisi" };
+const TIPI = { C: "Concorsi", G: "Manifestazioni d'interesse (idonei)", I: "Interpelli (elenchi idonei)", M: "Mobilità", A: "Altri (avviamenti, categorie protette…)" };
 function compartoDaTesto(t) {
   const m = String(t).toLowerCase().match(RE_COMPARTO);
   if (!m) return "";
@@ -274,14 +274,22 @@ function compartoDaTesto(t) {
 }
 const RE_MOBILITA = /(?:avviso|bando|procedura)\s+(?:pubblico\s+)?(?:di|per)\s+(?:la\s+)?mobilit|mobilit[aà]\s+(?:volontaria|esterna|tra\s+enti|ex\s+art)/;
 const RE_CONCORSO = /\bconcors|per\s+(?:soli\s+)?esami|per\s+titoli\s+ed\s+esami|selezione\s+pubblica/;
+// un bando vale per una regione se una qualunque delle sue sedi e' in quella regione (concorsi con piu' sedi)
+function inRegioni(b, regs) {
+  const t = (b.sedi.join(" | ") + " | " + (b.regione || "")).toLowerCase();
+  return regs.some(r => t.includes(String(r).toLowerCase()));
+}
+const RE_AVVIAMENTO = /avviament\w*\s+(?:numerico\s+)?a\s+selezion|collocamento\s+mirato|categorie\s+protette|riservat\w*\s+(?:esclusivamente\s+)?(?:ai\s+|alle\s+)?(?:soggetti\s+|persone\s+)?(?:disabil|con\s+disabilit|iscritti\s+(?:nelle\s+|alle\s+)?liste)|art\.?\s*16\s+(?:della\s+)?l(?:egge|\.)?\s*n?\.?\s*56\s*\/\s*(?:19)?87/;
 function testoAvviso(b) { return (b.titolo + " . " + b.profilo + " . " + (b.descrizione || "").slice(0, 800)).toLowerCase(); }
 function tipo(b) {
+  if (RE_AVVIAMENTO.test(testoAvviso(b))) return "A";      // avviamenti / categorie protette: mai concorsi aperti
   const x = (b.analisi && b.analisi.ai) || {};
   if (TIPI[x.tipo]) return x.tipo;
   const g = graduatoria(b);
   if (g) return g.elenco ? "I" : "G";
   const cat = (b.categoria || "").toLowerCase(), t = testoAvviso(b);
   if (cat.includes("mobilit") || RE_MOBILITA.test(t)) return "M";
+  if (RE_AVVIAMENTO.test(t)) return "A";
   if (!cat || cat.includes("concors") || RE_CONCORSO.test(t)) return "C";
   return "A";
 }
@@ -478,7 +486,7 @@ function passa(b, ignora) {
   const a = b.analisi;
   const g = giorniA(b.scadenza);
   if (g !== null && g < Number(F.scadmin || 0)) return false;
-  if (F.regioni.length && ignora !== "regione" && !F.regioni.includes(b.regione)) return false;
+  if (F.regioni.length && ignora !== "regione" && !inRegioni(b, F.regioni)) return false;
   if (F.tipi.length && ignora !== "tipi" && !F.tipi.includes(tipo(b))) return false;
   const gr = graduatoria(b);
   // prove, preselettiva e contratto valgono solo per i concorsi (e gli altri avvisi), non per le manifestazioni d'interesse
@@ -687,7 +695,7 @@ function disegnaNotifiche(nRis) {
   const att = NOTIF.filtri ? `Notifiche attuali${NOTIF.pausa ? " (in pausa)" : ""}: ${esc(descriviFiltriSalvati(NOTIF.filtri))}` : "";
   el.innerHTML = `🔔 <b>Notifiche Telegram</b> per i concorsi <b>nuovi</b> con questi filtri:<br>${esc(descriviFiltri())} — oggi ${nRis} bandi.${extra}${avviso}
     ${cod ? `<a class="btn" href="https://t.me/${esc(NOTIF.bot)}?start=${encodeURIComponent(cod)}" target="_blank" rel="noopener">🔔 Usa questi filtri per le notifiche</a>
-    <div class="att">Si apre Telegram: premi <b>Avvia</b>. Il bot conferma entro 10-20 minuti.</div>` : ""}
+    <div class="att">Si apre Telegram: premi <b>Avvia</b>. Il bot conferma in circa un minuto.</div>` : ""}
     ${att ? `<div class="att">${att}</div>` : ""}`;
 }
 
@@ -695,7 +703,12 @@ function disegnaNotifiche(nRis) {
 function disegna() {
   disegnaTitoli();
   disegnaIdoneita();
-  const cr = conta("regione", b => b.regione);
+  const tutteReg = [...new Set(Object.keys(REGIONI).concat(valoriDi(b => b.regione)))];
+  const cr = {};
+  for (const b of DATI) {
+    if (!passa(b, "regione")) continue;
+    for (const r of tutteReg) if (inRegioni(b, [r])) cr[r] = (cr[r] || 0) + 1;
+  }
   $("regioni").innerHTML = F.regioni.length
     ? F.regioni.map(r => `<button type="button" class="chip tit" data-k="${esc(r)}" title="Rimuovi">${esc(r)} <span class="n">${cr[r] || 0}</span><span class="x">✕</span></button>`).join("")
     : `<span class="meta">Tutte le regioni</span>`;

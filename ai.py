@@ -105,7 +105,9 @@ Regole:
 - tipo_avviso: "concorso" = concorso/selezione pubblica aperta (anche se il titolo non contiene la parola concorso);
   "manifestazione_interesse_graduatorie" = utilizzo/scorrimento di idonei in graduatorie di concorsi di altri enti;
   "interpello_elenco_idonei" = interpello su elenchi di idonei (es. ASMEL, elenchi di Unioni o Regioni): in tal caso elenco_idonei = nome dell'elenco;
-  "mobilita" = mobilita' volontaria tra enti.
+  "mobilita" = mobilita' volontaria tra enti;
+  "altro" = avviamenti a selezione tramite centri per l'impiego (art. 16 L. 56/87), collocamento mirato / categorie protette
+  (L. 68/99) riservati agli iscritti alle liste, incarichi, borse, tirocini e tutto cio' che non e' un concorso aperto.
 - livello: "Istruttore direttivo", "Area dei Funzionari e dell'Elevata Qualificazione", ex categoria D = funzionario;
   "Area degli Istruttori", ex categoria C = istruttore; "Area degli Assistenti" (Funzioni Centrali) = assistente;
   "Area degli Operatori (esperti)", ex categorie A/B = operatore. L'assistente sociale e' un funzionario.

@@ -103,7 +103,7 @@ RE_COMPARTO = re.compile(
     r"(?:che\s+applican\w*|del(?:lo\s+stesso|\s+medesimo)?\s+comparto|appartenent\w*\s+al(?:lo\s+stesso)?\s+comparto|soggett\w*\s+al)"
     r"[^.;]{0,40}?(funzioni\s+locali|enti\s+locali|regioni\s+e\s+(?:delle\s+)?autonomie\s+locali|funzioni\s+centrali|"
     r"sanit[aà]|istruzione\s+e\s+(?:della\s+)?ricerca)")
-TIPI = {"C": "Concorsi", "G": "Manifestazioni d'interesse (idonei)", "I": "Interpelli (elenchi idonei)", "M": "Mobilità", "A": "Altri avvisi"}
+TIPI = {"C": "Concorsi", "G": "Manifestazioni d'interesse (idonei)", "I": "Interpelli (elenchi idonei)", "M": "Mobilità", "A": "Altri (avviamenti, categorie protette…)"}
 
 
 def comparto_da_testo(t: str) -> str:
@@ -115,10 +115,16 @@ def comparto_da_testo(t: str) -> str:
 
 
 RE_MOBILITA = re.compile(r"(?:avviso|bando|procedura)\s+(?:pubblico\s+)?(?:di|per)\s+(?:la\s+)?mobilit|mobilit[aà]\s+(?:volontaria|esterna|tra\s+enti|ex\s+art)")
+RE_AVVIAMENTO = re.compile(
+    r"avviament\w*\s+(?:numerico\s+)?a\s+selezion|collocamento\s+mirato|categorie\s+protette|"
+    r"riservat\w*\s+(?:esclusivamente\s+)?(?:ai\s+|alle\s+)?(?:soggetti\s+|persone\s+)?(?:disabil|con\s+disabilit|iscritti\s+(?:nelle\s+|alle\s+)?liste)|"
+    r"art\.?\s*16\s+(?:della\s+)?l(?:egge|\.)?\s*n?\.?\s*56\s*/\s*(?:19)?87")
 RE_CONCORSO = re.compile(r"\bconcors|per\s+(?:soli\s+)?esami|per\s+titoli\s+ed\s+esami|selezione\s+pubblica")
 
 
 def tipo(b: dict) -> str:
+    if RE_AVVIAMENTO.search(testo_avviso(b)):      # avviamenti / categorie protette: mai concorsi aperti
+        return "A"
     x = (b.get("analisi") or {}).get("ai") or {}
     if x.get("tipo") in TIPI:
         return x["tipo"]
@@ -129,6 +135,8 @@ def tipo(b: dict) -> str:
     t = testo_avviso(b)
     if "mobilit" in cat or RE_MOBILITA.search(t):
         return "M"
+    if RE_AVVIAMENTO.search(t):
+        return "A"
     if not cat or "concors" in cat or RE_CONCORSO.search(t):
         return "C"
     return "A"
@@ -310,7 +318,8 @@ def passa(b: dict, f: dict) -> bool:
     if not a:
         return False
     regioni = [r.lower() for r in f.get("regioni") or []]
-    if regioni and not any(r in " ".join(b.get("sedi") or [b.get("regione", "")]).lower() for r in regioni):
+    sedi = (" | ".join(b.get("sedi") or []) + " | " + (b.get("regione") or "")).lower()
+    if regioni and not any(r in sedi for r in regioni):
         return False
     if f.get("tipi") and tipo(b) not in f["tipi"]:
         return False
