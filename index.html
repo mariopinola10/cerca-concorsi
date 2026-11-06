@@ -317,7 +317,14 @@ function valuta(b) {
     return [k, k === "si" ? "✓ idoneo " + nomeIdoneita(c) : k === "forse" ? "Da verificare: idoneità " + req : "Serve idoneità: " + req];
   }
   if (!F.titoli.length) return null;
-  const [k, tit] = compatMigliore(b, F.titoli);
+  let [k, tit] = compatMigliore(b, F.titoli);
+  const req = b.analisi ? LIV[b.analisi.titolo.livello] : undefined;
+  if (k === "si" && req !== undefined && req <= 1) {
+    // il bando chiede solo il diploma: se tra i tuoi titoli c'e' un diploma valido mostro quello
+    const dip = F.titoli.find(c => DIPLOMI[c] && compatibile(b, c) === "si");
+    if (dip) tit = dip;
+    else return [k, req === 0 ? `✓ Nessun titolo specifico (hai ${brevetitolo(tit)})` : `✓ Basta il diploma (hai ${brevetitolo(tit)})`];
+  }
   return [k, k === "si" ? "✓ " + brevetitolo(tit) : k === "forse" ? "Da verificare: " + brevetitolo(tit) : k === "?" ? "Titolo da verificare" : "Non per i tuoi titoli"];
 }
 const RANGO = { si: 3, forse: 2, "?": 1, no: 0 };

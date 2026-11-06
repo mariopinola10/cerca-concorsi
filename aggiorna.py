@@ -58,7 +58,7 @@ REGIONI = {r.strip().lower() for r in os.environ.get("REGIONI", "").split(",") i
 PAUSA = 0.4                 # secondi tra una richiesta e l'altra: essere discreti col portale
 MAX_PDF_MB = 20
 MAX_PAGINE_PDF = 60
-VERSIONE_CLASSIFICATORE = 4  # alzala se cambi le regole: i bandi in cache verranno rianalizzati
+VERSIONE_CLASSIFICATORE = 5  # alzala se cambi le regole: i bandi in cache verranno rianalizzati
 
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
@@ -185,6 +185,10 @@ RE_UNICA_SCRITTA = re.compile(
     r"prova\s+scritta\s+unica|prova\s+unica\s+scritta|esclusivamente\s+(?:in\s+)?(?:una\s+)?prova\s+scritta|"
     r"unica\s+prova\s+(?:d'esame\s+)?(?:consistente\s+in|a\s+risposta\s+multipla|mediante\s+test)")
 RE_PRESELETTIVA = re.compile(r"preselettiv|preselezion")
+RE_NO_PRES = re.compile(
+    r"(?:senza|non\s+(?:è|e'|e|sarà|sara'|verrà|verra')\s+(?:previst[ao]|effettuat[ao]|svolt[ao])|non\s+(?:si\s+)?prevede|esclus[ao]|nessuna)\s+"
+    r"(?:la\s+|alcuna\s+|una\s+|lo\s+svolgimento\s+(?:di\s+|della\s+)?|l'eventuale\s+|eventuale\s+)?"
+    r"(?:prova\s+)?(?:preselettiv\w*|preselezion\w*)")
 RE_COLLOQUIO_CONOSCITIVO = re.compile(r"colloquio\s+(?:di\s+)?(?:lingua|conoscitivo|motivazional)")
 
 TIPO_PROCEDURA = {   # campo tipoProcedura dell'API inPA
@@ -196,7 +200,7 @@ TIPO_PROCEDURA = {   # campo tipoProcedura dell'API inPA
 
 def classifica_prove(t: str, tipo_proc: str | None, ha_pdf: bool) -> dict:
     tipo_proc = (tipo_proc or "").upper()
-    preselettiva = bool(RE_PRESELETTIVA.search(t))
+    preselettiva = bool(RE_PRESELETTIVA.search(RE_NO_PRES.sub(" ", t)))
     if tipo_proc in TIPO_PROCEDURA:
         return {"prove": TIPO_PROCEDURA[tipo_proc], "preselettiva": preselettiva, "pratica": False,
                 "conf": "alta", "perche": f"Tipo procedura su inPA: {tipo_proc.replace('_', ' ').lower()}"}

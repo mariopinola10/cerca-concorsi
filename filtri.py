@@ -176,6 +176,15 @@ def valuta(b: dict, f: dict) -> tuple[str, str] | None:
     if not f.get("titoli"):
         return None
     k, tit = compat_migliore(b, f["titoli"])
+    req = LIV.get(((b.get("analisi") or {}).get("titolo") or {}).get("livello"))
+    if k == "si" and req is not None and req <= 1:
+        # il bando chiede solo il diploma: se tra i tuoi titoli c'e' un diploma valido mostro quello
+        dip = next((c for c in f["titoli"] if c in DIPLOMI and compatibile(b, c) == "si"), None)
+        if dip:
+            tit = dip
+        else:
+            return k, (f"nessun titolo specifico (hai {etichetta_titolo(tit)})" if req == 0
+                       else f"basta il diploma (hai {etichetta_titolo(tit)})")
     return k, {"si": etichetta_titolo(tit), "forse": f"{etichetta_titolo(tit)} da verificare", "?": "titolo da verificare"}.get(k, "")
 
 
