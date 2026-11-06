@@ -51,13 +51,9 @@ jobs:
       - name: Notifiche bandi nuovi
         if: ${{ steps.aggiorna.outcome == 'success' }}
         env:
-          # --- i tuoi filtri (modificali qui) ---
+          # filtri di partenza: valgono finche' non li imposti dalla pagina (pulsante 🔔) o dal bot
           NOTIFICA_REGIONI: "Campania"
-          NOTIFICA_LAUREA: "L-31"
-          NOTIFICA_COMPAT: "forse"          # "si" = solo compatibili certi, "forse" = anche da verificare
-          NOTIFICA_PROVE: ""                # es. "solo_scritto,scritto_orale"
-          NOTIFICA_CONTRATTO: ""            # es. "indeterminato"
-          NOTIFICA_NO_PRESELETTIVA: "0"     # "1" = escludi bandi con preselettiva
+          NOTIFICA_TITOLI: "L-31"
           # --- canali: si configurano in Settings -> Secrets and variables -> Actions ---
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -76,6 +72,5 @@ jobs:
             echo "Nessuna novita'"
           else
             git commit -m "Aggiornamento bandi $(date -u +'%Y-%m-%d %H:%M') UTC"
-            git pull --rebase origin main
-            git push
+            for i in 1 2 3; do git pull --rebase origin main && git push && break; sleep 5; done
           fi

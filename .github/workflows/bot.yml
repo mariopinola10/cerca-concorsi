@@ -1,0 +1,47 @@
+# Bot Telegram: ogni ~10 minuti legge i messaggi arrivati al bot (comandi e link dei filtri dalla pagina),
+# risponde e salva i filtri delle notifiche in data/notifiche.json.
+name: Bot Telegram
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # GitHub puo' ritardare i giri di qualche minuto
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bot-telegram
+  cancel-in-progress: false
+
+jobs:
+  bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Dipendenze
+        run: pip install requests
+
+      - name: Leggi i messaggi e rispondi
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python bot.py
+
+      - name: Salva la configurazione
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/notifiche.json 2>/dev/null || true
+          if git diff --staged --quiet; then
+            echo "Nessuna modifica"
+          else
+            git commit -m "Bot: filtri notifiche aggiornati"
+            for i in 1 2 3; do git pull --rebase origin main && git push && break; sleep 5; done
+          fi
