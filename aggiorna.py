@@ -398,6 +398,21 @@ def firma(raw: dict) -> str:
     return "|".join(str(raw.get(k) or "") for k in ("titolo", "dataScadenza", "allegatoMediaId", "dataPubblicazione"))
 
 
+def pulisci_html(x) -> str:
+    x = re.sub(r"<[^>]+>", " ", x or "") if isinstance(x, str) else ""
+    x = x.replace("&nbsp;", " ").replace("&amp;", "&").replace("&#39;", "'").replace("&quot;", '"')
+    return re.sub(r"\s+", " ", x).strip()
+
+
+def descrizione_di(raw: dict) -> str:
+    """descrizione breve del bando (il nome del campo non e' documentato: si provano i candidati)"""
+    for k in ("descrizione", "descrizioneBreve", "abstract", "oggetto", "description"):
+        d = pulisci_html(raw.get(k))
+        if d:
+            return d[:1500]
+    return ""
+
+
 def base_record(raw: dict) -> dict:
     sedi = [s for s in (raw.get("sedi") or []) if isinstance(s, str)]
     enti = [e for e in (raw.get("entiRiferimento") or []) if isinstance(e, str)]
@@ -409,6 +424,7 @@ def base_record(raw: dict) -> dict:
         "id": raw["id"],
         "titolo": (raw.get("titolo") or "").strip(),
         "profilo": (raw.get("figuraRicercata") or "").strip(),
+        "descrizione": descrizione_di(raw),
         "ente": enti[0] if enti else "",
         "sedi": sedi,
         "regione": sedi[0] if sedi else "",
@@ -431,6 +447,8 @@ def analizza(cli: Client, raw: dict) -> dict:
         testo_det = stringhe(det)
         if isinstance(det.get("company"), dict) and det["company"].get("name"):
             rec["ente"] = det["company"]["name"]
+        if not rec["descrizione"]:
+            rec["descrizione"] = descrizione_di(det)
         allegati = sorted([a for a in (det.get("allegati") or []) if isinstance(a, dict) and a.get("mediaId")],
                           key=lambda a: (a.get("tipo") != "BANDO_CONCORSO", a.get("sequence") or 99))
     except ErroreFonte as e:
@@ -452,7 +470,7 @@ def analizza(cli: Client, raw: dict) -> dict:
             break
 
     ha_pdf = len(testo_pdf_tot.strip()) > 500
-    intest = normalizza(f"{rec['titolo']} . {rec['profilo']}")
+    intest = normalizza(f"{rec['titolo']} . {rec['profilo']} . {rec['descrizione'][:500]}")
     t = normalizza(f"{rec['titolo']} . {rec['profilo']} . {testo_det} . {testo_pdf_tot}")
 
     comparto = ""
@@ -543,7 +561,14 @@ def main():
     for raw in elenco:
         c = cache.get(raw["id"])
         if c and c.get("firma") == firma(raw):
-            bandi.append(c["rec"])
+            # i campi dell'elenco (descrizione, sedi, posti...) si rileggono a ogni giro; l'analisi viene dalla cache
+            rec = {**base_record(raw), "analisi": c["rec"].get("analisi")}
+            for k in ("ente", "pdf"):
+                if c["rec"].get(k):
+                    rec[k] = c["rec"][k]
+            if not rec["descrizione"] and c["rec"].get("descrizione"):
+                rec["descrizione"] = c["rec"]["descrizione"]
+            bandi.append(rec)
         else:
             bandi.append({**base_record(raw), "analisi": None})   # in coda per il prossimo giro
 

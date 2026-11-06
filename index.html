@@ -272,15 +272,18 @@ function compartoDaTesto(t) {
   const x = m[1];
   return x.includes("local") ? "L" : x.includes("centrali") ? "C" : x.startsWith("sanit") ? "S" : "U";
 }
+const RE_MOBILITA = /(?:avviso|bando|procedura)\s+(?:pubblico\s+)?(?:di|per)\s+(?:la\s+)?mobilit|mobilit[aà]\s+(?:volontaria|esterna|tra\s+enti|ex\s+art)/;
+const RE_CONCORSO = /\bconcors|per\s+(?:soli\s+)?esami|per\s+titoli\s+ed\s+esami|selezione\s+pubblica/;
+function testoAvviso(b) { return (b.titolo + " . " + b.profilo + " . " + (b.descrizione || "").slice(0, 800)).toLowerCase(); }
 function tipo(b) {
   if (graduatoria(b)) return "G";
-  const cat = (b.categoria || "").toLowerCase();
-  if (cat.includes("mobilit")) return "M";
-  if (!cat || cat.includes("concors")) return "C";
+  const cat = (b.categoria || "").toLowerCase(), t = testoAvviso(b);
+  if (cat.includes("mobilit") || RE_MOBILITA.test(t)) return "M";
+  if (!cat || cat.includes("concors") || RE_CONCORSO.test(t)) return "C";
   return "A";
 }
 function graduatoria(b) {
-  const t = (b.titolo + " . " + b.profilo).toLowerCase();
+  const t = testoAvviso(b);
   if (!RE_GRAD.test(t)) return null;
   const liv = (LIV_PROF.find(([, r]) => r.test(t)) || [""])[0];
   const aree = Object.keys(AREE_PROF).filter(k => AREE_PROF[k][1].test(t));
@@ -483,7 +486,7 @@ function passa(b, ignora) {
   if (F.q) {
     const { classi, parole } = analizzaRicerca(F.q);
     if (classi.length && !(a && classi.some(c => a.titolo.classi.includes(c)))) return false;
-    const hay = (b.titolo + " " + b.profilo + " " + b.ente + " " + b.sedi.join(" ") + " " + (b.settori || []).join(" ")).toLowerCase();
+    const hay = (b.titolo + " " + b.profilo + " " + (b.descrizione || "") + " " + b.ente + " " + b.sedi.join(" ") + " " + (b.settori || []).join(" ")).toLowerCase();
     if (!parole.every(w => hay.includes(w))) return false;
   }
   return true;
@@ -578,9 +581,13 @@ function scheda(b) {
   }
   const sc = g === null ? "" : `<span class="scad${g < 7 ? " urg" : ""}">Scade ${fmtData(b.scadenza)}${g >= 0 && g < 30 ? ` (${Math.max(0, Math.floor(g))} gg)` : ""}</span>`;
   const sede = b.sedi.slice(1).join(", ") || b.regione;
+  const norm = x => (x || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const descr = b.descrizione && !norm(b.descrizione).includes(norm(b.titolo).slice(0, 60)) && !norm(b.titolo).includes(norm(b.descrizione).slice(0, 60))
+    ? `<details class="why"><summary>Descrizione</summary><p>${esc(b.descrizione)}</p></details>` : "";
   return `<article class="card">
     <h2>${esc(b.titolo || b.profilo)}</h2>
     <div class="meta">${esc(b.ente)}${sede ? " · " + esc(sede) : ""}${b.posti ? " · " + b.posti + (b.posti === 1 ? " posto" : " posti") : ""}${b.categoria ? " · " + esc(b.categoria) : ""}</div>
+    ${descr}
     <div class="badges">${bad}</div>
     <div class="links">${sc}<a href="${esc(b.url)}" target="_blank" rel="noopener">Apri su inPA</a>${b.pdf ? `<a href="${esc(b.pdf)}" target="_blank" rel="noopener">Bando PDF</a>` : ""}</div>
     ${why}

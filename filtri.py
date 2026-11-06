@@ -114,19 +114,28 @@ def comparto_da_testo(t: str) -> str:
     return "L" if ("local" in x) else "C" if "centrali" in x else "S" if x.startswith("sanit") else "U"
 
 
+RE_MOBILITA = re.compile(r"(?:avviso|bando|procedura)\s+(?:pubblico\s+)?(?:di|per)\s+(?:la\s+)?mobilit|mobilit[aà]\s+(?:volontaria|esterna|tra\s+enti|ex\s+art)")
+RE_CONCORSO = re.compile(r"\bconcors|per\s+(?:soli\s+)?esami|per\s+titoli\s+ed\s+esami|selezione\s+pubblica")
+
+
 def tipo(b: dict) -> str:
     if graduatoria(b):
         return "G"
     cat = (b.get("categoria") or "").lower()
-    if "mobilit" in cat:
+    t = testo_avviso(b)
+    if "mobilit" in cat or RE_MOBILITA.search(t):
         return "M"
-    if not cat or "concors" in cat:
+    if not cat or "concors" in cat or RE_CONCORSO.search(t):
         return "C"
     return "A"
 
 
+def testo_avviso(b: dict) -> str:
+    return f"{b.get('titolo', '')} . {b.get('profilo', '')} . {(b.get('descrizione') or '')[:800]}".lower()
+
+
 def graduatoria(b: dict) -> dict | None:
-    t = f"{b.get('titolo', '')} . {b.get('profilo', '')}".lower()
+    t = testo_avviso(b)
     if not RE_GRAD.search(t):
         return None
     liv = next((k for k, r in LIV_PROF if r.search(t)), "")
