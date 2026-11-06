@@ -4,65 +4,35 @@
    "Campania"
   ],
   "prove": [
+   "non_rilevato",
    "solo_scritto",
-   "scritto_orale",
-   "solo_orale",
-   "titoli",
-   "non_rilevato"
+   "titoli"
   ],
   "contratto": [
    "indeterminato",
    "non_rilevato"
   ],
   "titoli": [
-   "L-31",
-   "DIP",
    "DIP-INF",
+   "DIP",
    "L-9",
-   "LM-22"
+   "LM-22",
+   "L-31"
   ],
   "idoneita": [
-   "FINFL",
-   "AINFC"
+   "AINFC",
+   "FINFL"
   ],
-  "tipi": [
-   "C",
-   "G"
-  ],
-  "verificare": true,
+  "tipi": [],
+  "verificare": false,
   "nopres": false
  },
  "pausa": false,
- "offset": 689769962,
+ "offset": 689769963,
  "visti_extra": [
-  "6e28e516aa414fbdb27c06d00fd52ec7",
-  "4df79e7254124454a1e292bd68745e43",
-  "4a23fb08beb24adcaacd13496bd402a6",
-  "f59391d574394674806674ee6d5ea602",
-  "85f9ec99f75547a3b2367d948a746afa",
-  "710ecc877ac64e3c8d891915bb0b1d02",
-  "9b399bacb1e745408540eb91c35bbc1d",
-  "bb741eaed9f04dc08270c4baa3aedfce",
-  "efea10b4a4674f51bd251a0201f83c94",
-  "115f528b524f4f33bd326683f438ba17",
-  "8039c3f82d4644989a10fe857cfc636e",
-  "e2545370869b40fc97cac56cba8ebcf1",
-  "3b3368e921b642e0b5a8d4e162718e21",
-  "1c04b252ecac416e84322d3cee5ba7fb",
-  "362ddd68838e4561902be93c26bf8ae6",
-  "56d87f5f26034515ade59c5ff3f1f5c1",
-  "02da45ce9b6f4edb9078e4f966cbd829",
-  "4138f6b19796470b9faa70acbba46778",
-  "2ae3e52cb23543d2a45af40f00cedefc",
-  "67871596ba75426295103c92b06d5b6e",
-  "ec80a2c5adb1449e91d94337e7cf11a1",
-  "0bc98ef37f9749ecb6c24c1eb53e0a54",
   "068a4ba9d6554bbe9ac71d5f3b822094",
-  "cb06e02c72184265a03a8169c134e076",
-  "145079ed0148434da789fb65c7f83a02",
-  "f91522355f4c48f4ba510703d860b7a4",
-  "26c22390e75443e0aa78140fbbc6876f"
+  "cb06e02c72184265a03a8169c134e076"
  ],
  "bot": "PAconco_BOT",
- "aggiornato": "2026-11-06T15:26+00:00"
+ "aggiornato": "2026-11-06T15:31+00:00"
 }
