@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cerca Concorsi</title>
+<meta name="theme-color" content="#1f4e79">
+<style>
+  :root {
+    --bg: #f4f6f9; --card: #fff; --txt: #1b2430; --muted: #5d6b7c; --line: #dde3ea;
+    --acc: #1f4e79; --acc-soft: #e3edf7; --ok: #1d7a46; --ok-soft: #e1f3e8;
+    --warn: #9a6400; --warn-soft: #fbf0d9; --bad: #a33a2b; --bad-soft: #f8e4e0;
+    --chip: #eef1f5; --r: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #11161d; --card: #1a212b; --txt: #e6ebf1; --muted: #9aa7b6; --line: #2b3542;
+      --acc: #7fb3e6; --acc-soft: #1e3247; --ok: #6fd39b; --ok-soft: #173327;
+      --warn: #e8b85a; --warn-soft: #3a2f17; --bad: #f08c7c; --bad-soft: #3d201b; --chip: #232c38;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--txt); }
+  header { position: sticky; top: 0; z-index: 5; background: var(--acc); color: #fff; padding: 12px 16px calc(10px); }
+  @media (prefers-color-scheme: dark) { header { background: #16304a; } }
+  header h1 { margin: 0; font-size: 19px; }
+  header .sub { font-size: 12.5px; opacity: .85; margin-top: 2px; }
+  main { max-width: 860px; margin: 0 auto; padding: 12px; }
+  .search { width: 100%; padding: 11px 14px; font-size: 16px; border-radius: var(--r); border: 1px solid var(--line); background: var(--card); color: var(--txt); }
+  details.filtri { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); margin: 10px 0; }
+  details.filtri > summary { cursor: pointer; padding: 11px 14px; font-weight: 600; list-style: none; display: flex; justify-content: space-between; }
+  details.filtri > summary::-webkit-details-marker { display: none; }
+  details.filtri > summary::after { content: "▾"; color: var(--muted); }
+  details.filtri[open] > summary::after { content: "▴"; }
+  .fbody { padding: 0 14px 12px; }
+  .grp { margin: 10px 0 4px; }
+  .grp > label, .grp > .lbl { display: block; font-size: 12.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; margin-bottom: 6px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { border: 1px solid var(--line); background: var(--chip); color: var(--txt); border-radius: 999px; padding: 6px 12px; font-size: 14px; cursor: pointer; user-select: none; }
+  .chip[aria-pressed="true"] { background: var(--acc); border-color: var(--acc); color: #fff; }
+  @media (prefers-color-scheme: dark) { .chip[aria-pressed="true"] { color: #0e1a26; } }
+  .chip .n { opacity: .7; font-size: 12px; margin-left: 3px; }
+  select, input[type=text].small { width: 100%; padding: 9px 10px; font-size: 15px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--txt); }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .chk { display: flex; align-items: center; gap: 8px; font-size: 14.5px; margin-top: 8px; }
+  .bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 6px 2px 10px; font-size: 13.5px; color: var(--muted); flex-wrap: wrap; }
+  .bar button { background: none; border: none; color: var(--acc); font-size: 13.5px; cursor: pointer; padding: 0; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; margin-bottom: 10px; }
+  .card h2 { font-size: 15.5px; margin: 0 0 4px; line-height: 1.35; }
+  .meta { color: var(--muted); font-size: 13px; }
+  .badges { display: flex; flex-wrap: wrap; gap: 5px; margin: 9px 0 6px; }
+  .b { font-size: 12.5px; padding: 3px 8px; border-radius: 6px; background: var(--chip); white-space: nowrap; }
+  .b.p { background: var(--acc-soft); color: var(--acc); font-weight: 600; }
+  .b.ok { background: var(--ok-soft); color: var(--ok); font-weight: 600; }
+  .b.warn { background: var(--warn-soft); color: var(--warn); }
+  .b.bad { background: var(--bad-soft); color: var(--bad); }
+  .b.dub { border: 1px dashed currentColor; }
+  .scad { font-weight: 600; }
+  .scad.urg { color: var(--bad); }
+  .links { display: flex; gap: 14px; margin-top: 6px; font-size: 14px; flex-wrap: wrap; align-items: center; }
+  .links a { color: var(--acc); text-decoration: none; font-weight: 600; }
+  details.why { margin-top: 6px; font-size: 13px; color: var(--muted); }
+  details.why summary { cursor: pointer; color: var(--acc); }
+  details.why p { margin: 6px 0; }
+  details.why b { color: var(--txt); }
+  .empty, .err { text-align: center; color: var(--muted); padding: 30px 10px; }
+  .err { color: var(--bad); }
+  .more { display: block; width: 100%; padding: 11px; border-radius: var(--r); border: 1px solid var(--line); background: var(--card); color: var(--acc); font-size: 15px; font-weight: 600; cursor: pointer; }
+  footer { text-align: center; color: var(--muted); font-size: 12px; padding: 18px 10px 30px; }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Cerca Concorsi</h1>
+  <div class="sub" id="stato">Caricamento…</div>
+</header>
+<main>
+  <input class="search" id="q" type="search" placeholder="Cerca: informatico, Comune di Napoli, ASL…" autocomplete="off">
+
+  <details class="filtri" id="pannello" open>
+    <summary><span>Filtri <span id="nfiltri" class="meta"></span></span></summary>
+    <div class="fbody">
+      <div class="row2">
+        <div class="grp"><label for="regione">Regione</label><select id="regione"></select></div>
+        <div class="grp"><label for="categoria">Tipo</label><select id="categoria"></select></div>
+      </div>
+
+      <div class="grp"><span class="lbl">Prove</span><div class="chips" id="f-prove"></div></div>
+      <label class="chk"><input type="checkbox" id="nopres"> Escludi bandi con preselettiva</label>
+
+      <div class="grp"><span class="lbl">Contratto</span><div class="chips" id="f-contratto"></div></div>
+
+      <div class="grp"><span class="lbl">Titolo di studio</span>
+        <div class="row2">
+          <div><input class="small" type="text" id="mialaurea" list="classi" placeholder="La tua laurea, es. L-31" autocomplete="off"></div>
+          <div><select id="compat">
+            <option value="tutti">Tutti i bandi</option>
+            <option value="forse">Compatibili o da verificare</option>
+            <option value="si">Solo compatibili</option>
+          </select></div>
+        </div>
+        <datalist id="classi"></datalist>
+      </div>
+
+      <div class="row2">
+        <div class="grp"><label for="ordina">Ordina per</label>
+          <select id="ordina">
+            <option value="scadenza">Scadenza più vicina</option>
+            <option value="recenti">Pubblicati di recente</option>
+            <option value="posti">Più posti</option>
+          </select></div>
+        <div class="grp"><label for="scadmin">Scadenza</label>
+          <select id="scadmin">
+            <option value="0">Tutti gli aperti</option>
+            <option value="3">Almeno 3 giorni</option>
+            <option value="7">Almeno 7 giorni</option>
+            <option value="14">Almeno 14 giorni</option>
+          </select></div>
+      </div>
+      <div class="bar" style="margin-bottom:0"><span></span><button id="reset" type="button">Azzera filtri</button></div>
+    </div>
+  </details>
+
+  <div class="bar"><span id="conteggio"></span></div>
+  <div id="lista"></div>
+</main>
+<footer>
+  Dati dal <a href="https://www.inpa.gov.it" target="_blank" rel="noopener">Portale inPA</a>, letti in automatico.
+  Prove, contratto e lauree sono ricavati dal testo del bando: verifica sempre sul bando ufficiale.
+</footer>
+
+<script>
+"use strict";
+const ETICHETTE = {
+  prove: {
+    solo_scritto: "Solo scritto", scritto_orale: "Scritto + orale", solo_orale: "Solo orale / colloquio",
+    titoli: "Solo titoli", titoli_colloquio: "Titoli + colloquio", non_rilevato: "Da verificare"
+  },
+  contratto: { indeterminato: "Indeterminato", determinato: "Determinato", entrambi: "Ind. e det.", non_rilevato: "Da verificare" },
+  livello: { nessuno: "Scuola dell'obbligo", diploma: "Diploma", triennale: "Laurea triennale", magistrale: "Laurea magistrale", non_rilevato: "Titolo non rilevato" }
+};
+const LIV = { nessuno: 0, diploma: 1, triennale: 2, magistrale: 3 };
+// classe di laurea -> area disciplinare (stesse chiavi usate da aggiorna.py)
+const AREA_CLASSE = {
+  "L-31": "informatica", "LM-18": "informatica", "LM-66": "informatica", "LM-91": "informatica",
+  "L-8": "ingegneria", "L-7": "ingegneria", "L-9": "ingegneria", "LM-32": "ingegneria", "LM-23": "ingegneria",
+  "LM-24": "ingegneria", "LM-25": "ingegneria", "LM-27": "ingegneria", "LM-29": "ingegneria", "LM-33": "ingegneria",
+  "LMG-01": "giurisprudenza", "L-14": "giurisprudenza",
+  "L-18": "economia", "L-33": "economia", "L-41": "economia", "LM-56": "economia", "LM-77": "economia", "LM-82": "economia", "LM-16": "economia",
+  "L-16": "scienze_politiche", "L-36": "scienze_politiche", "L-40": "scienze_politiche", "LM-52": "scienze_politiche", "LM-62": "scienze_politiche", "LM-63": "scienze_politiche", "LM-88": "scienze_politiche",
+  "L-24": "psicologia", "LM-51": "psicologia",
+  "L-39": "servizio_sociale", "LM-87": "servizio_sociale",
+  "L-19": "educazione", "LM-85": "educazione", "LM-57": "educazione",
+  "L-17": "architettura", "L-21": "architettura", "LM-4": "architettura", "LM-48": "architettura",
+  "L-10": "umanistica", "L-1": "umanistica", "L-5": "umanistica", "L-11": "umanistica", "L-12": "umanistica", "LM-14": "umanistica", "LM-89": "umanistica",
+  "L-27": "scienze", "L-30": "scienze", "L-32": "scienze", "L-34": "scienze", "L-25": "scienze", "L-13": "sanita", "LM-6": "sanita", "LM-41": "sanita", "LM-13": "sanita"
+};
+const PASSO = 60;
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const ls = {
+  get(k, d) { try { const v = localStorage.getItem("cc_" + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem("cc_" + k, JSON.stringify(v)); } catch {} }
+};
+
+const DEFAULT = { q: "", regione: "Campania", categoria: "", prove: [], contratto: [], nopres: false, mialaurea: "L-31", compat: "tutti", ordina: "scadenza", scadmin: 0 };
+let F = Object.assign({}, DEFAULT, ls.get("filtri", {}));
+let DATI = [], mostrati = PASSO;
+
+function normClasse(s) {
+  const m = String(s || "").toUpperCase().replace(/\s+/g, "").match(/^(LMG|LM|LS|L)[-/]?(SNT)?(\d{1,2})$/);
+  if (!m) return String(s || "").trim().toUpperCase();
+  if (m[1] === "LMG") return "LMG-01";
+  return m[1] + "-" + (m[2] ? "SNT" : "") + parseInt(m[3], 10);
+}
+function livelloMio(c) {
+  if (!c) return null;
+  if (/^DIPLOMA/i.test(c)) return 1;
+  if (/^L-/.test(c)) return 2;
+  if (/^(LM|LS|LMG)-/.test(c)) return 3;
+  return null;
+}
+
+// "si" | "forse" | "no" | "?"
+function compatibile(b, mia) {
+  const a = b.analisi;
+  if (!a || !mia) return "?";
+  const t = a.titolo, mio = livelloMio(mia), req = LIV[t.livello];
+  if (req !== undefined && mio !== null && mio < req) return "no";
+  if (req !== undefined && req <= 1) return "si";
+  if (t.classi.includes(mia)) return "si";
+  if (t.qualsiasi_laurea) return "si";
+  const area = AREA_CLASSE[mia];
+  if (area && t.aree.includes(area)) return "forse";
+  if (t.classi.length || t.aree.length) return "no";
+  return "?";
+}
+
+function giorniA(scad) {
+  if (!scad) return null;
+  const d = new Date(scad.length <= 10 ? scad + "T23:59:00" : scad);
+  return isNaN(d) ? null : (d - Date.now()) / 86400000;
+}
+function fmtData(s) {
+  if (!s) return "";
+  const d = new Date(s.length <= 10 ? s + "T12:00:00" : s);
+  return isNaN(d) ? s : d.toLocaleDateString("it-IT", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function passa(b, ignora) {
+  const a = b.analisi;
+  const g = giorniA(b.scadenza);
+  if (g !== null && g < Number(F.scadmin || 0)) return false;
+  if (F.regione && ignora !== "regione" && b.regione !== F.regione) return false;
+  if (F.categoria && ignora !== "categoria" && b.categoria !== F.categoria) return false;
+  if (F.prove.length && ignora !== "prove") {
+    const v = a ? a.prove.prove : "non_rilevato";
+    if (!F.prove.includes(v)) return false;
+  }
+  if (F.nopres && a && a.prove.preselettiva) return false;
+  if (F.contratto.length && ignora !== "contratto") {
+    const v = a ? a.contratto.contratto : "non_rilevato";
+    if (!(F.contratto.includes(v) || (v === "entrambi" && F.contratto.some(x => x === "indeterminato" || x === "determinato")))) return false;
+  }
+  if (F.compat !== "tutti") {
+    const c = compatibile(b, normClasse(F.mialaurea));
+    if (F.compat === "si" && c !== "si") return false;
+    if (F.compat === "forse" && c === "no") return false;
+  }
+  if (F.q) {
+    const hay = (b.titolo + " " + b.profilo + " " + b.ente + " " + b.sedi.join(" ") + " " + (b.settori || []).join(" ")).toLowerCase();
+    if (!F.q.toLowerCase().split(/\s+/).filter(Boolean).every(w => hay.includes(w))) return false;
+  }
+  return true;
+}
+
+function conta(campo, chiave) {
+  const n = {};
+  for (const b of DATI) {
+    if (!passa(b, campo)) continue;
+    const k = chiave(b);
+    n[k] = (n[k] || 0) + 1;
+  }
+  return n;
+}
+
+function chips(el, campo, opzioni, conteggi) {
+  el.innerHTML = opzioni.map(([k, lab]) =>
+    `<button type="button" class="chip" data-k="${esc(k)}" aria-pressed="${F[campo].includes(k)}">${esc(lab)}<span class="n">${conteggi[k] || 0}</span></button>`
+  ).join("");
+  el.onclick = e => {
+    const c = e.target.closest(".chip"); if (!c) return;
+    const k = c.dataset.k, arr = F[campo];
+    F[campo] = arr.includes(k) ? arr.filter(x => x !== k) : arr.concat(k);
+    salva(); disegna();
+  };
+}
+
+function selectOpzioni(el, campo, conteggi, tuttiLabel) {
+  const chiavi = Object.keys(conteggi).filter(Boolean).sort((a, b) => a.localeCompare(b, "it"));
+  if (F[campo] && !chiavi.includes(F[campo])) chiavi.unshift(F[campo]);
+  el.innerHTML = `<option value="">${esc(tuttiLabel)}</option>` +
+    chiavi.map(k => `<option value="${esc(k)}"${k === F[campo] ? " selected" : ""}>${esc(k)} (${conteggi[k] || 0})</option>`).join("");
+}
+
+function badge(cls, txt, dubbio) { return `<span class="b ${cls}${dubbio ? " dub" : ""}">${esc(txt)}${dubbio ? " ?" : ""}</span>`; }
+
+function scheda(b, mia) {
+  const a = b.analisi, g = giorniA(b.scadenza);
+  let bad = "";
+  let why = "";
+  if (a) {
+    const p = a.prove, c = a.contratto, t = a.titolo;
+    bad += badge("p", p.prove === "non_rilevato" ? "Prove da verificare" : (ETICHETTE.prove[p.prove] || p.prove), p.conf === "bassa" && p.prove !== "non_rilevato");
+    if (p.preselettiva) bad += badge("warn", "Preselettiva");
+    if (p.pratica) bad += badge("", "Prova pratica");
+    bad += badge("", c.contratto === "non_rilevato" ? "Contratto da verificare" : (ETICHETTE.contratto[c.contratto] || c.contratto), c.conf === "bassa" && c.contratto !== "non_rilevato");
+    if (c.part_time) bad += badge("", "Part-time");
+    if (t.livello !== "non_rilevato") bad += badge("", ETICHETTE.livello[t.livello] || t.livello);
+    if (t.classi.length) bad += badge("", t.classi.slice(0, 6).join(" · ") + (t.classi.length > 6 ? " …" : ""));
+    if (t.qualsiasi_laurea) bad += badge("", "Qualsiasi laurea");
+    if (mia) {
+      const k = compatibile(b, mia);
+      if (k === "si") bad += badge("ok", "Compatibile con " + mia);
+      else if (k === "forse") bad += badge("warn", "Da verificare per " + mia);
+      else if (k === "no") bad += badge("bad", "Non per " + mia);
+    }
+    const righe = [];
+    if (p.perche) righe.push(`<p><b>Prove:</b> ${esc(p.perche)}</p>`);
+    if (c.perche) righe.push(`<p><b>Contratto:</b> ${esc(c.perche)}</p>`);
+    if (t.perche) righe.push(`<p><b>Titolo:</b> ${esc(t.perche)}</p>`);
+    if (t.aree.length) righe.push(`<p><b>Aree di laurea citate:</b> ${esc(t.aree.join(", ").replace(/_/g, " "))}</p>`);
+    if (!a.pdf_letto) righe.push(`<p>Il PDF del bando non è stato letto (assente o scansionato): dati parziali.</p>`);
+    if (righe.length) why = `<details class="why"><summary>Perché queste etichette</summary>${righe.join("")}</details>`;
+  } else {
+    bad += badge("warn", "Analisi in corso");
+  }
+  const sc = g === null ? "" : `<span class="scad${g < 7 ? " urg" : ""}">Scade ${fmtData(b.scadenza)}${g >= 0 && g < 30 ? ` (${Math.max(0, Math.floor(g))} gg)` : ""}</span>`;
+  const sede = b.sedi.slice(1).join(", ") || b.regione;
+  return `<article class="card">
+    <h2>${esc(b.titolo || b.profilo)}</h2>
+    <div class="meta">${esc(b.ente)}${sede ? " · " + esc(sede) : ""}${b.posti ? " · " + b.posti + (b.posti === 1 ? " posto" : " posti") : ""}${b.categoria ? " · " + esc(b.categoria) : ""}</div>
+    <div class="badges">${bad}</div>
+    <div class="links">${sc}<a href="${esc(b.url)}" target="_blank" rel="noopener">Apri su inPA</a>${b.pdf ? `<a href="${esc(b.pdf)}" target="_blank" rel="noopener">Bando PDF</a>` : ""}</div>
+    ${why}
+  </article>`;
+}
+
+function ordina(arr) {
+  const k = F.ordina;
+  return arr.sort((x, y) =>
+    k === "recenti" ? (y.pubblicato || "").localeCompare(x.pubblicato || "") :
+    k === "posti" ? (y.posti || 0) - (x.posti || 0) :
+    (x.scadenza || "9999").localeCompare(y.scadenza || "9999"));
+}
+
+function disegna() {
+  const mia = normClasse(F.mialaurea);
+  selectOpzioni($("regione"), "regione", conta("regione", b => b.regione), "Tutte le regioni");
+  selectOpzioni($("categoria"), "categoria", conta("categoria", b => b.categoria), "Tutti i tipi");
+  chips($("f-prove"), "prove", Object.entries(ETICHETTE.prove), conta("prove", b => b.analisi ? b.analisi.prove.prove : "non_rilevato"));
+  const cc = conta("contratto", b => b.analisi ? b.analisi.contratto.contratto : "non_rilevato");
+  if (cc.entrambi) { cc.indeterminato = (cc.indeterminato || 0) + cc.entrambi; cc.determinato = (cc.determinato || 0) + cc.entrambi; }
+  chips($("f-contratto"), "contratto", [["indeterminato", "Indeterminato"], ["determinato", "Determinato"], ["non_rilevato", "Da verificare"]], cc);
+
+  const ris = ordina(DATI.filter(b => passa(b)));
+  const attivi = [F.regione, F.categoria, F.q, F.nopres, F.compat !== "tutti", Number(F.scadmin) > 0].filter(Boolean).length + F.prove.length + F.contratto.length;
+  $("nfiltri").textContent = attivi ? `(${attivi} attivi)` : "";
+  $("conteggio").textContent = `${ris.length} bandi trovati`;
+  const html = ris.slice(0, mostrati).map(b => scheda(b, mia)).join("");
+  $("lista").innerHTML = ris.length
+    ? html + (ris.length > mostrati ? `<button class="more" id="altri" type="button">Mostra altri ${Math.min(PASSO, ris.length - mostrati)}</button>` : "")
+    : `<div class="empty">Nessun bando con questi filtri.</div>`;
+  const altri = $("altri");
+  if (altri) altri.onclick = () => { mostrati += PASSO; disegna(); };
+}
+
+function salva() { mostrati = PASSO; ls.set("filtri", F); }
+
+function collega() {
+  const set = (id, campo, ev = "change", tr = v => v) => {
+    const el = $(id);
+    if (el.type === "checkbox") el.checked = !!F[campo]; else el.value = F[campo];
+    el.addEventListener(ev, () => { F[campo] = tr(el.type === "checkbox" ? el.checked : el.value); salva(); disegna(); });
+  };
+  set("q", "q", "input");
+  set("regione", "regione");
+  set("categoria", "categoria");
+  set("nopres", "nopres");
+  set("mialaurea", "mialaurea", "change");
+  set("compat", "compat");
+  set("ordina", "ordina");
+  set("scadmin", "scadmin");
+  $("reset").onclick = () => {
+    F = Object.assign({}, DEFAULT, { mialaurea: F.mialaurea, regione: "" });
+    ["q", "nopres", "compat", "ordina", "scadmin", "mialaurea"].forEach(id => {
+      const el = $(id); if (el.type === "checkbox") el.checked = !!F[id]; else el.value = F[id];
+    });
+    salva(); disegna();
+  };
+  $("classi").innerHTML = Object.keys(AREA_CLASSE).sort().map(c => `<option value="${c}">`).join("");
+  if (matchMedia("(max-width: 600px)").matches && ls.get("filtri", null)) $("pannello").open = false;
+}
+
+async function avvia() {
+  collega();
+  try {
+    const r = await fetch("data/bandi.json?t=" + Date.now(), { cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const d = await r.json();
+    DATI = (d.bandi || []).map(b => Object.assign({ sedi: [], settori: [] }, b));
+    const agg = d.aggiornato ? new Date(d.aggiornato).toLocaleString("it-IT", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "?";
+    $("stato").textContent = `${d.totale} bandi aperti · aggiornato ${agg}` + (d.in_coda ? ` · ${d.in_coda} in analisi` : "");
+    disegna();
+  } catch (e) {
+    $("stato").textContent = "Dati non disponibili";
+    $("lista").innerHTML = `<div class="err">Non riesco a leggere data/bandi.json (${esc(e.message)}).<br>Avvia il workflow «Aggiorna concorsi» dalla scheda Actions del repository.</div>`;
+  }
+}
+avvia();
+</script>
+</body>
+</html>
