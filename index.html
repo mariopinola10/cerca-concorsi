@@ -122,7 +122,7 @@
           <input class="small" type="url" id="idlink" placeholder="Link al bando (facoltativo)" autocomplete="off">
         </div>
         <button class="btn" id="addid" type="button" style="width:100%;margin-top:8px">Aggiungi idoneità</button>
-        <div class="hint">Valgono per le <b>manifestazioni d'interesse</b> (utilizzo di idonei in graduatorie di altri enti): lì conta l'idoneità nel profilo richiesto, non il titolo di studio. Assistente (Funzioni Centrali) e Istruttore (Funzioni Locali) sono considerati livelli equivalenti.</div>
+        <div class="hint">Valgono per le <b>manifestazioni d'interesse</b> (utilizzo di idonei in graduatorie di altri enti): lì contano solo regione e idoneità nel profilo richiesto, non titolo di studio, prove o contratto. Assistente (Funzioni Centrali) e Istruttore (Funzioni Locali) sono considerati livelli equivalenti.</div>
       </div>
 
       <div class="grp"><span class="lbl">Regioni</span>
@@ -132,10 +132,10 @@
 
       <div class="grp"><span class="lbl">Tipo di avviso</span><div class="chips" id="f-tipi"></div></div>
 
-      <div class="grp"><span class="lbl">Prove</span><div class="chips" id="f-prove"></div></div>
+      <div class="grp"><span class="lbl">Prove <span style="text-transform:none;font-weight:400">(solo concorsi)</span></span><div class="chips" id="f-prove"></div></div>
       <label class="chk"><input type="checkbox" id="nopres"> Escludi bandi con preselettiva</label>
 
-      <div class="grp"><span class="lbl">Contratto</span><div class="chips" id="f-contratto"></div></div>
+      <div class="grp"><span class="lbl">Contratto <span style="text-transform:none;font-weight:400">(solo concorsi)</span></span><div class="chips" id="f-contratto"></div></div>
 
       <div class="row2">
         <div class="grp"><label for="ordina">Ordina per</label>
@@ -444,13 +444,16 @@ function passa(b, ignora) {
   if (g !== null && g < Number(F.scadmin || 0)) return false;
   if (F.regioni.length && ignora !== "regione" && !F.regioni.includes(b.regione)) return false;
   if (F.tipi.length && ignora !== "tipi" && !F.tipi.includes(tipo(b))) return false;
-  if (F.prove.length && ignora !== "prove" && !F.prove.includes(a ? a.prove.prove : "non_rilevato")) return false;
-  if (F.nopres && a && a.prove.preselettiva) return false;
-  if (F.contratto.length && ignora !== "contratto") {
-    const v = a ? a.contratto.contratto : "non_rilevato";
-    if (!(F.contratto.includes(v) || (v === "entrambi" && F.contratto.some(x => x === "indeterminato" || x === "determinato")))) return false;
-  }
   const gr = graduatoria(b);
+  // prove, preselettiva e contratto valgono solo per i concorsi (e gli altri avvisi), non per le manifestazioni d'interesse
+  if (!gr) {
+    if (F.prove.length && ignora !== "prove" && !F.prove.includes(a ? a.prove.prove : "non_rilevato")) return false;
+    if (F.nopres && a && a.prove.preselettiva) return false;
+    if (F.contratto.length && ignora !== "contratto") {
+      const v = a ? a.contratto.contratto : "non_rilevato";
+      if (!(F.contratto.includes(v) || (v === "entrambi" && F.contratto.some(x => x === "indeterminato" || x === "determinato")))) return false;
+    }
+  }
   if (gr || F.titoli.length) {
     const [k] = valuta(b);
     if (k === "no" || (!F.verificare && k !== "si")) return false;
@@ -625,8 +628,8 @@ function disegna() {
       .filter(r => !F.regioni.includes(r))
       .map(r => `<option value="${esc(r)}">${esc(r)} (${cr[r] || 0})</option>`).join("");
   chips($("f-tipi"), "tipi", Object.entries(TIPI), conta("tipi", tipo));
-  chips($("f-prove"), "prove", Object.entries(ETICHETTE.prove), conta("prove", b => b.analisi ? b.analisi.prove.prove : "non_rilevato"));
-  const cc = conta("contratto", b => b.analisi ? b.analisi.contratto.contratto : "non_rilevato");
+  chips($("f-prove"), "prove", Object.entries(ETICHETTE.prove), conta("prove", b => graduatoria(b) ? "" : (b.analisi ? b.analisi.prove.prove : "non_rilevato")));
+  const cc = conta("contratto", b => graduatoria(b) ? "" : (b.analisi ? b.analisi.contratto.contratto : "non_rilevato"));
   if (cc.entrambi) { cc.indeterminato = (cc.indeterminato || 0) + cc.entrambi; cc.determinato = (cc.determinato || 0) + cc.entrambi; }
   chips($("f-contratto"), "contratto", [["indeterminato", "Indeterminato"], ["determinato", "Determinato"], ["non_rilevato", "Da verificare"]], cc);
 

@@ -259,16 +259,18 @@ def passa(b: dict, f: dict) -> bool:
     regioni = [r.lower() for r in f.get("regioni") or []]
     if regioni and not any(r in " ".join(b.get("sedi") or [b.get("regione", "")]).lower() for r in regioni):
         return False
-    if f.get("prove") and a["prove"]["prove"] not in f["prove"]:
-        return False
-    if f.get("nopres") and a["prove"]["preselettiva"]:
-        return False
-    if f.get("contratto"):
-        c = a["contratto"]["contratto"]
-        if not (c in f["contratto"] or (c == "entrambi" and {"indeterminato", "determinato"} & set(f["contratto"]))):
-            return False
     if f.get("tipi") and tipo(b) not in f["tipi"]:
         return False
+    # prove, preselettiva e contratto valgono solo per i concorsi, non per le manifestazioni d'interesse (idonei)
+    if not graduatoria(b):
+        if f.get("prove") and a["prove"]["prove"] not in f["prove"]:
+            return False
+        if f.get("nopres") and a["prove"]["preselettiva"]:
+            return False
+        if f.get("contratto"):
+            c = a["contratto"]["contratto"]
+            if not (c in f["contratto"] or (c == "entrambi" and {"indeterminato", "determinato"} & set(f["contratto"]))):
+                return False
     v = valuta(b, f)
     if v:
         k = v[0]
