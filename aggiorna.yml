@@ -12,6 +12,10 @@ on:
         description: "Quanti bandi nuovi analizzare in questo giro (primo giro: 2000)"
         required: false
         default: "400"
+      max_ai:
+        description: "Quanti bandi far leggere a Gemini in questo giro (gratuito: max ~1000 al giorno)"
+        required: false
+        default: "150"
       probe:
         description: "Scrivi 'si' per stampare solo un record grezzo dell'API (diagnostica)"
         required: false
@@ -27,9 +31,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 170
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -46,6 +50,9 @@ jobs:
         env:
           MAX_NUOVI: ${{ github.event.inputs.max_nuovi || '400' }}
           REGIONI: ""          # es. "Campania" per analizzare i PDF solo di quella regione
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}   # gratuita da aistudio.google.com; senza chiave restano le regole
+          MAX_AI: ${{ github.event.inputs.max_ai || '150' }}
+          AI_PRIORITA: "Campania"   # regioni lette per prime da Gemini
         run: python aggiorna.py
 
       - name: Notifiche bandi nuovi

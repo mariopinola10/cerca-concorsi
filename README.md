@@ -16,6 +16,7 @@ Pagina per cercare i concorsi pubblici aperti su [inPA](https://www.inpa.gov.it)
 | `aggiorna.py` | GitHub Actions, 4 volte al giorno | Legge i bandi aperti da inPA, scarica il PDF dei bandi **nuovi** e ne ricava prove, contratto, lauree e diplomi richiesti → `data/bandi.json` |
 | `notifica.py` | subito dopo `aggiorna.py` | Manda su Telegram/email i bandi nuovi che rispettano i filtri delle notifiche |
 | `bot.py` | GitHub Actions, ogni ~10 minuti | Legge i messaggi al bot Telegram (filtri inviati dalla pagina, comandi) e risponde |
+| `ai.py` | dentro `aggiorna.py` | Lettura dei bandi con Gemini (gratuito, facoltativo) |
 | `filtri.py` | – | Logica comune dei filtri (la stessa è replicata in `index.html`) |
 | `index.html` | GitHub Pages | La pagina con i filtri |
 | `.github/workflows/aggiorna.yml`, `bot.yml` | – | Programmazione dei due workflow |
@@ -29,6 +30,16 @@ I dati stanno in `data/`: `bandi.json` (bandi aperti), `cache.json` (analisi gi�
 3. Actions → *Aggiorna concorsi* → **Run workflow** con *max_nuovi* = `2000` (primo giro: ~1 ora).
 4. Settings → Pages → Source **Deploy from a branch** → `main` / `(root)` → Save.
    La pagina è su `https://<utente>.github.io/cerca-concorsi/`.
+
+## Analisi con AI gratuita (Google Gemini)
+
+Se c'è il secret `GEMINI_API_KEY`, ogni bando nuovo viene letto anche da **Gemini** (livello gratuito, nessuna carta di credito), che ricava tipo di avviso (concorso, manifestazione d'interesse, interpello ASMEL, mobilità), profilo/livello/comparto, prove, preselettiva, contratto e titoli ammessi, con la frase del bando. Dove risponde sostituisce le regole automatiche; i PDF scansionati vengono letti lo stesso.
+
+1. Vai su **aistudio.google.com** con un account Google → **Get API key** → **Create API key** → copia la chiave.
+2. Settings → Secrets and variables → Actions → New repository secret → `GEMINI_API_KEY`.
+3. Al giro successivo Gemini legge fino a 150 bandi (prima la Campania); i bandi già presenti vengono riletti a poco a poco. Quando la quota gratuita del giorno finisce, si ferma e riprende il giorno dopo.
+
+Nella scheda del bando, "Perché queste etichette" mostra 🤖 quando l'analisi viene da Gemini. Nel livello gratuito Google può usare i testi inviati per migliorare i suoi servizi: sono bandi pubblici, nessun dato personale.
 
 ## Notifiche
 

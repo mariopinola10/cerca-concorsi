@@ -265,7 +265,7 @@ const NOMI_LIV = { D: "Dirigente", F: "Funzionario", A: "Assistente", I: "Istrut
 const LIV_EQ = { A: "I" };   // Assistenti (Funzioni Centrali) = Istruttori (Funzioni Locali)
 const COMPARTI = { L: "Funzioni Locali", C: "Funzioni Centrali", S: "Sanità", U: "Istruzione e ricerca" };
 const RE_COMPARTO = /(?:enti|amministrazioni|pubbliche\s+amministrazioni)[^.;]{0,50}?(?:che\s+applican\w*|del(?:lo\s+stesso|\s+medesimo)?\s+comparto|appartenent\w*\s+al(?:lo\s+stesso)?\s+comparto|soggett\w*\s+al)[^.;]{0,40}?(funzioni\s+locali|enti\s+locali|regioni\s+e\s+(?:delle\s+)?autonomie\s+locali|funzioni\s+centrali|sanit[aà]|istruzione\s+e\s+(?:della\s+)?ricerca)/;
-const TIPI = { C: "Concorsi", G: "Manifestazioni d'interesse (idonei)", M: "Mobilità", A: "Altri avvisi" };
+const TIPI = { C: "Concorsi", G: "Manifestazioni d'interesse (idonei)", I: "Interpelli (elenchi idonei)", M: "Mobilità", A: "Altri avvisi" };
 function compartoDaTesto(t) {
   const m = String(t).toLowerCase().match(RE_COMPARTO);
   if (!m) return "";
@@ -276,13 +276,24 @@ const RE_MOBILITA = /(?:avviso|bando|procedura)\s+(?:pubblico\s+)?(?:di|per)\s+(
 const RE_CONCORSO = /\bconcors|per\s+(?:soli\s+)?esami|per\s+titoli\s+ed\s+esami|selezione\s+pubblica/;
 function testoAvviso(b) { return (b.titolo + " . " + b.profilo + " . " + (b.descrizione || "").slice(0, 800)).toLowerCase(); }
 function tipo(b) {
-  if (graduatoria(b)) return "G";
+  const x = (b.analisi && b.analisi.ai) || {};
+  if (TIPI[x.tipo]) return x.tipo;
+  const g = graduatoria(b);
+  if (g) return g.elenco ? "I" : "G";
   const cat = (b.categoria || "").toLowerCase(), t = testoAvviso(b);
   if (cat.includes("mobilit") || RE_MOBILITA.test(t)) return "M";
   if (!cat || cat.includes("concors") || RE_CONCORSO.test(t)) return "C";
   return "A";
 }
 function graduatoria(b) {
+  const x = (b.analisi && b.analisi.ai) || {};
+  if (x.tipo) {                              // letto da Gemini: vale la sua classificazione
+    if (x.tipo !== "G" && x.tipo !== "I") return null;
+    const aree = x.area ? [x.area] : [];
+    const nome = x.profilo || ((NOMI_LIV[x.liv] || "Profilo") + " " + aree.map(a => AREE_PROF[a][0]).join("/")).trim();
+    const elenco = x.elenco || (x.tipo === "I" ? "ALTRO" : "");
+    return { liv: x.liv || "", aree, nome, comparto: elenco === "ASMEL" ? "L" : (x.comparto || ""), elenco };
+  }
   const t = testoAvviso(b);
   if (!RE_GRAD.test(t)) return null;
   const liv = (LIV_PROF.find(([, r]) => r.test(t)) || [""])[0];
@@ -544,6 +555,38 @@ function aggiungiTitolo(testo) {
   salva(); disegna();
 }
 
+// ======================= analisi con Claude =======================
+function promptClaude(b) {
+  const tit = F.titoli.map(etichettaTitolo).join("; ") || "non indicati";
+  const idon = F.idoneita.map(nomeIdoneita).join("; ") || "nessuna";
+  const descr = (b.descrizione || "").slice(0, 500);
+  return [
+    "Analizza per me questo avviso pubblico italiano. Leggi la scheda e il PDF del bando dai link.",
+    `Titolo: ${b.titolo}`,
+    `Ente: ${b.ente}${b.sedi.length ? " (" + b.sedi.join(", ") + ")" : ""}`,
+    `Scheda inPA: ${b.url}`,
+    b.pdf ? `PDF del bando: ${b.pdf}` : "",
+    descr ? `Descrizione: ${descr}` : "",
+    b.scadenza ? `Scadenza: ${fmtData(b.scadenza)}` : "",
+    "",
+    `Il mio profilo — titoli di studio: ${tit}. Idoneità in graduatorie/elenchi: ${idon}.`,
+    "",
+    "Rispondi in italiano, conciso, con questi punti:",
+    "1) Tipo di procedura (concorso, utilizzo graduatorie, interpello su elenco idonei, mobilità…).",
+    "2) Requisiti di accesso (titolo di studio, idoneità, altro) e se io li possiedo.",
+    "3) Prove d'esame ed eventuale preselettiva.",
+    "4) Contratto (tempo indeterminato/determinato, pieno/parziale) e profilo/area.",
+    "5) Come e entro quando candidarsi, documenti e costi.",
+    "6) Punti di attenzione o clausole particolari.",
+    "Per ogni punto cita la frase del bando su cui ti basi; se un'informazione non c'è, dillo."
+  ].filter(x => x !== "").join("\n");
+}
+function linkClaude(b) {
+  let p = promptClaude(b);
+  if (p.length > 3500) p = p.slice(0, 3500);
+  return "https://claude.ai/new?q=" + encodeURIComponent(p);
+}
+
 function badge(cls, txt, dubbio) { return `<span class="b ${cls}${dubbio ? " dub" : ""}">${esc(txt)}${dubbio ? " ?" : ""}</span>`; }
 
 function scheda(b) {
@@ -554,7 +597,7 @@ function scheda(b) {
     const gr = graduatoria(b);
     if (gr) bad += badge("p", etichettaAvviso(gr));
     bad += badge("p", p.prove === "non_rilevato" ? "Prove da verificare" : (ETICHETTE.prove[p.prove] || p.prove), p.conf === "bassa" && p.prove !== "non_rilevato");
-    if (p.preselettiva) bad += badge("warn", "Preselettiva");
+    if (p.preselettiva) bad += badge("warn", p.preselettiva_eventuale ? "Preselettiva eventuale" : "Preselettiva");
     if (p.pratica) bad += badge("", "Prova pratica");
     bad += badge("", c.contratto === "non_rilevato" ? "Contratto da verificare" : (ETICHETTE.contratto[c.contratto] || c.contratto), c.conf === "bassa" && c.contratto !== "non_rilevato");
     if (c.part_time) bad += badge("", "Part-time");
@@ -572,6 +615,10 @@ function scheda(b) {
     if (c.perche) righe.push(`<p><b>Contratto:</b> ${esc(c.perche)}</p>`);
     if (t.perche) righe.push(`<p><b>Titolo:</b> ${esc(t.perche)}</p>`);
     if (t.aree.length) righe.push(`<p><b>Aree di laurea citate:</b> ${esc(t.aree.join(", ").replace(/_/g, " "))}</p>`);
+    if (a.ai) {
+      if (a.ai.perche) righe.unshift(`<p><b>Tipo di avviso:</b> ${esc(a.ai.perche)}</p>`);
+      righe.push(`<p>🤖 Etichette lette da Gemini${a.ai.elenco_nome ? " · elenco: " + esc(a.ai.elenco_nome) : ""}.</p>`);
+    }
     if (!a.pdf_letto) righe.push(`<p>Il PDF del bando non è stato letto (assente o scansionato): dati parziali.</p>`);
     if (righe.length) why = `<details class="why"><summary>Perché queste etichette</summary>${righe.join("")}</details>`;
   } else {
@@ -589,7 +636,7 @@ function scheda(b) {
     <div class="meta">${esc(b.ente)}${sede ? " · " + esc(sede) : ""}${b.posti ? " · " + b.posti + (b.posti === 1 ? " posto" : " posti") : ""}${b.categoria ? " · " + esc(b.categoria) : ""}</div>
     ${descr}
     <div class="badges">${bad}</div>
-    <div class="links">${sc}<a href="${esc(b.url)}" target="_blank" rel="noopener">Apri su inPA</a>${b.pdf ? `<a href="${esc(b.pdf)}" target="_blank" rel="noopener">Bando PDF</a>` : ""}</div>
+    <div class="links">${sc}<a href="${esc(b.url)}" target="_blank" rel="noopener">Apri su inPA</a>${b.pdf ? `<a href="${esc(b.pdf)}" target="_blank" rel="noopener">Bando PDF</a>` : ""}<a class="ai" data-id="${esc(b.id)}" href="${esc(linkClaude(b))}" target="_blank" rel="noopener">🤖 Analizza con Claude</a></div>
     ${why}
   </article>`;
 }
@@ -727,6 +774,13 @@ function collega() {
     const c = e.target.closest(".chip.tit"); if (!c) return;
     F.regioni = F.regioni.filter(x => x !== c.dataset.k); salva(); disegna();
   };
+  $("lista").addEventListener("click", e => {
+    const a = e.target.closest("a.ai"); if (!a) return;
+    const b = DATI.find(x => x.id === a.dataset.id); if (!b) return;
+    try { navigator.clipboard.writeText(promptClaude(b)); } catch {}
+    a.textContent = "🤖 Apro Claude… (richiesta copiata)";
+    setTimeout(() => { a.textContent = "🤖 Analizza con Claude"; }, 4000);
+  });
   $("titoli").onclick = e => {
     const c = e.target.closest(".chip.tit"); if (!c) return;
     F.titoli = F.titoli.filter(x => x !== c.dataset.k); salva(); disegna();

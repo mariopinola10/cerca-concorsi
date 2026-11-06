@@ -103,7 +103,7 @@ RE_COMPARTO = re.compile(
     r"(?:che\s+applican\w*|del(?:lo\s+stesso|\s+medesimo)?\s+comparto|appartenent\w*\s+al(?:lo\s+stesso)?\s+comparto|soggett\w*\s+al)"
     r"[^.;]{0,40}?(funzioni\s+locali|enti\s+locali|regioni\s+e\s+(?:delle\s+)?autonomie\s+locali|funzioni\s+centrali|"
     r"sanit[aà]|istruzione\s+e\s+(?:della\s+)?ricerca)")
-TIPI = {"C": "Concorsi", "G": "Manifestazioni d'interesse (idonei)", "M": "Mobilità", "A": "Altri avvisi"}
+TIPI = {"C": "Concorsi", "G": "Manifestazioni d'interesse (idonei)", "I": "Interpelli (elenchi idonei)", "M": "Mobilità", "A": "Altri avvisi"}
 
 
 def comparto_da_testo(t: str) -> str:
@@ -119,8 +119,12 @@ RE_CONCORSO = re.compile(r"\bconcors|per\s+(?:soli\s+)?esami|per\s+titoli\s+ed\s
 
 
 def tipo(b: dict) -> str:
-    if graduatoria(b):
-        return "G"
+    x = (b.get("analisi") or {}).get("ai") or {}
+    if x.get("tipo") in TIPI:
+        return x["tipo"]
+    g = graduatoria(b)
+    if g:
+        return "I" if g.get("elenco") else "G"
     cat = (b.get("categoria") or "").lower()
     t = testo_avviso(b)
     if "mobilit" in cat or RE_MOBILITA.search(t):
@@ -135,6 +139,15 @@ def testo_avviso(b: dict) -> str:
 
 
 def graduatoria(b: dict) -> dict | None:
+    x = (b.get("analisi") or {}).get("ai") or {}
+    if x.get("tipo"):                          # letto da Gemini: vale la sua classificazione
+        if x["tipo"] not in ("G", "I"):
+            return None
+        aree = [x["area"]] if x.get("area") else []
+        nome = x.get("profilo") or f"{NOMI_LIV.get(x.get('liv', ''), 'Profilo')} {'/'.join(AREE_PROF[a][0] for a in aree)}".strip()
+        elenco = x.get("elenco") or ("ALTRO" if x["tipo"] == "I" else "")
+        comp = "L" if elenco == "ASMEL" else x.get("comparto", "")
+        return {"liv": x.get("liv", ""), "aree": aree, "nome": nome, "comparto": comp, "elenco": elenco}
     t = testo_avviso(b)
     if not RE_GRAD.search(t):
         return None

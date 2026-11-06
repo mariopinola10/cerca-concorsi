@@ -39,6 +39,8 @@ from pathlib import Path
 
 import requests
 
+import ai
+
 # --------------------------------------------------------------------------------------
 # Configurazione
 # --------------------------------------------------------------------------------------
@@ -54,6 +56,9 @@ CACHE_FILE = DATA / "cache.json"
 OUT_FILE = DATA / "bandi.json"
 
 MAX_NUOVI = int(os.environ.get("MAX_NUOVI", "400"))
+MAX_AI = int(os.environ.get("MAX_AI", "150"))              # bandi da far leggere a Gemini per giro (livello gratuito)
+AI_PRIORITA = [r.strip().lower() for r in os.environ.get("AI_PRIORITA", "Campania").split(",") if r.strip()]
+ai_restanti = MAX_AI
 REGIONI = {r.strip().lower() for r in os.environ.get("REGIONI", "").split(",") if r.strip()}
 PAUSA = 0.4                 # secondi tra una richiesta e l'altra: essere discreti col portale
 MAX_PDF_MB = 20
@@ -457,7 +462,7 @@ def analizza(cli: Client, raw: dict) -> dict:
     media = [a["mediaId"] for a in allegati[:2]] or ([raw["allegatoMediaId"]] if raw.get("allegatoMediaId") else [])
     if media:
         rec["pdf"] = MEDIA.format(mid=media[0])
-    testo_pdf_tot = ""
+    testo_pdf_tot, pdf_primo = "", None
     for mid in media:
         try:
             dati = cli.pdf(mid)
@@ -465,6 +470,7 @@ def analizza(cli: Client, raw: dict) -> dict:
             log.warning("PDF %s non scaricato: %s", mid, e)
             continue
         if dati:
+            pdf_primo = pdf_primo or dati
             testo_pdf_tot += "\n" + testo_pdf(dati)
         if len(testo_pdf_tot) > 3000:   # basta il bando principale
             break
@@ -486,6 +492,23 @@ def analizza(cli: Client, raw: dict) -> dict:
         "pdf_letto": ha_pdf,
         "v": VERSIONE_CLASSIFICATORE,
     }
+
+    # lettura con Gemini (gratuita, se c'e' la chiave): sostituisce le regole dove risponde
+    global ai_restanti
+    if ai_restanti > 0 and ai.disponibile():
+        ai_restanti -= 1
+        try:
+            ris = ai.analizza(rec["titolo"], f"{rec['profilo']}\n{rec['descrizione']}\n{testo_det}\n{testo_pdf_tot}",
+                              pdf=None if ha_pdf else pdf_primo)
+        except ai.QuotaEsaurita as e:
+            log.warning("Gemini: quota gratuita esaurita per oggi (%s)", e)
+            ris = None
+        if ris:
+            ai.applica(rec["analisi"], ris)
+            if not ha_pdf and pdf_primo:
+                rec["analisi"]["pdf_letto"] = True     # letto da Gemini anche se scansionato
+        elif not ai.esaurito:
+            rec["analisi"]["ai_tentativi"] = 1
     return rec
 
 
@@ -540,9 +563,23 @@ def main():
     nuovi = [r for r in elenco
              if in_regioni(r) and (r["id"] not in cache or cache[r["id"]].get("firma") != firma(r)
                                    or cache[r["id"]].get("rec", {}).get("analisi", {}).get("v") != VERSIONE_CLASSIFICATORE)]
-    # prima i bandi in scadenza piu' vicina: sono quelli che servono subito
-    nuovi.sort(key=lambda r: r.get("dataScadenza") or "9999")
+    # prima le regioni prioritarie (per la quota AI), poi i bandi in scadenza piu' vicina
+    def priorita(r):
+        sedi = " ".join(s for s in (r.get("sedi") or []) if isinstance(s, str)).lower()
+        return (not any(p in sedi for p in AI_PRIORITA), r.get("dataScadenza") or "9999")
+    nuovi.sort(key=priorita)
     da_fare = nuovi[:MAX_NUOVI]
+    # bandi gia' analizzati con le regole ma non ancora letti da Gemini: si rileggono finche' c'e' quota
+    if ai.disponibile():
+        ids_nuovi = {r["id"] for r in da_fare}
+        arretrati = [r for r in elenco if r["id"] not in ids_nuovi and r["id"] in cache
+                     and cache[r["id"]].get("firma") == firma(r)
+                     and not (cache[r["id"]]["rec"].get("analisi") or {}).get("ai")
+                     and not (cache[r["id"]]["rec"].get("analisi") or {}).get("ai_tentativi")]
+        arretrati.sort(key=priorita)
+        posto = max(0, MAX_AI - sum(1 for _ in da_fare))
+        da_fare += arretrati[:posto]
+        log.info("Gemini attivo: fino a %d bandi in questo giro (%d arretrati in attesa)", MAX_AI, len(arretrati))
     log.info("da analizzare: %d (questo giro: %d)", len(nuovi), len(da_fare))
 
     t0 = time.time()
