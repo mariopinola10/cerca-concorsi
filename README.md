@@ -2,63 +2,58 @@
 
 Pagina per cercare i concorsi pubblici aperti su [inPA](https://www.inpa.gov.it) con filtri che il portale non ha:
 
+- **Titoli di studio**: uno o più (es. diploma informatico + L-31 + L-9), anche cercandoli per nome; vedi solo i bandi a cui puoi accedere
 - **Prove**: solo scritto · scritto + orale · solo orale/colloquio · solo titoli · titoli + colloquio (+ esclusione preselettiva)
 - **Contratto**: tempo indeterminato · determinato (+ part-time)
-- **Titolo di studio**: classi di laurea (L-31, LM-18…), "qualsiasi laurea", livello minimo, compatibilità con la tua laurea
-- Regione, tipo di procedura, scadenza, ricerca libera
+- Regione, tipo di procedura, scadenza, ricerca libera (scrivendo una classe, es. `L-9`, vedi solo i bandi che la citano)
+- **Notifiche Telegram/email** dei bandi nuovi, con i filtri scelti dalla pagina
 
-## Come funziona
+## File
 
-| Parte | Dove gira | Cosa fa |
+| File | Dove gira | Cosa fa |
 |---|---|---|
-| `aggiorna.py` | GitHub Actions, 4 volte al giorno | Legge i bandi aperti dall'API pubblica di inPA, scarica il PDF dei bandi **nuovi**, ne ricava prove/contratto/lauree e scrive `data/bandi.json` |
-| `index.html` | GitHub Pages | Legge `data/bandi.json` e applica i filtri nel browser |
+| `aggiorna.py` | GitHub Actions, 4 volte al giorno | Legge i bandi aperti da inPA, scarica il PDF dei bandi **nuovi** e ne ricava prove, contratto, lauree e diplomi richiesti → `data/bandi.json` |
+| `notifica.py` | subito dopo `aggiorna.py` | Manda su Telegram/email i bandi nuovi che rispettano i filtri delle notifiche |
+| `bot.py` | GitHub Actions, ogni ~10 minuti | Legge i messaggi al bot Telegram (filtri inviati dalla pagina, comandi) e risponde |
+| `filtri.py` | – | Logica comune dei filtri (la stessa è replicata in `index.html`) |
+| `index.html` | GitHub Pages | La pagina con i filtri |
+| `.github/workflows/aggiorna.yml`, `bot.yml` | – | Programmazione dei due workflow |
 
-Niente server e niente costi: i bandi già analizzati restano in `data/cache.json`, quindi ogni giro analizza solo le novità.
+I dati stanno in `data/`: `bandi.json` (bandi aperti), `cache.json` (analisi già fatte), `notifiche.json` (filtri delle notifiche), `notificati.json` (bandi già segnalati).
 
-## Installazione (anche da smartphone, dal browser su github.com)
+## Installazione
 
-1. **Crea il repository** `cerca-concorsi` (Add → New repository). Pubblico va bene: i dati sono pubblici.
-2. **Aggiungi i file** con *Add file → Create new file*, incollando il contenuto:
-   - `index.html`
-   - `aggiorna.py`
-   - `.github/workflows/aggiorna.yml` (scrivendo il percorso con le barre, GitHub crea le cartelle)
-   - `README.md` (facoltativo)
-3. **Permessi del workflow**: Settings → Actions → General → *Workflow permissions* → **Read and write permissions** → Save.
-4. **Primo giro**: Actions → *Aggiorna concorsi* → **Run workflow** → in *max_nuovi* scrivi `2000` → Run.
-   Dura circa 1-1,5 ore (analizza tutti i bandi aperti, ~1.700). I giri successivi durano pochi minuti.
-5. **Pubblica la pagina**: Settings → Pages → *Build and deployment* → Source **Deploy from a branch** → Branch `main`, cartella `/ (root)` → Save.
-   Dopo un paio di minuti la pagina è su `https://<tuo-utente>.github.io/cerca-concorsi/`.
+1. Crea il repository e carica tutti i file (da PC: *uploading an existing file* e trascina il contenuto dello zip, cartella `.github` compresa).
+2. Settings → Actions → General → *Workflow permissions* → **Read and write permissions** → Save.
+3. Actions → *Aggiorna concorsi* → **Run workflow** con *max_nuovi* = `2000` (primo giro: ~1 ora).
+4. Settings → Pages → Source **Deploy from a branch** → `main` / `(root)` → Save.
+   La pagina è su `https://<utente>.github.io/cerca-concorsi/`.
 
-Su telefono: apri la pagina e usa *Aggiungi a schermata Home* per averla come app.
+## Notifiche
 
-## Notifiche (Telegram e/o email)
+### Telegram (consigliato)
+1. Su Telegram: **@BotFather** → `/newbot` → copia il **token**.
+2. Apri il tuo bot e premi **Avvia**.
+3. Apri `https://api.telegram.org/bot<TOKEN>/getUpdates` e copia il numero dopo `"chat":{"id":`.
+4. Settings → Secrets and variables → Actions → crea i secret `TELEGRAM_TOKEN` e `TELEGRAM_CHAT_ID`.
+5. Actions → *Bot Telegram* → **Run workflow** una volta: da quel momento la pagina mostra il pulsante 🔔.
 
-`notifica.py` gira dopo ogni aggiornamento e segnala **solo i bandi nuovi** che rispettano i filtri `NOTIFICA_*` scritti nel workflow (default: Campania, compatibili con L-31). Al primo avvio manda solo un messaggio di conferma.
+**Scegliere i filtri delle notifiche**: imposta i filtri sulla pagina e tocca **🔔 Usa questi filtri per le notifiche**. Si apre Telegram: premi **Avvia**. Entro 10-20 minuti il bot conferma i filtri ed elenca i bandi già aperti che li rispettano; da lì in poi ti scrive solo per quelli nuovi. Ricerca libera, tipo e scadenza non valgono per le notifiche.
 
-I canali si attivano aggiungendo i secret in **Settings → Secrets and variables → Actions → New repository secret**:
+Comandi del bot: `/filtri` (filtri attuali), `/bandi` (elenco dei bandi aperti che li rispettano), `/pausa`, `/riprendi`, `/aiuto`.
+Il bot risponde solo alla tua chat.
 
-**Telegram**
-1. Su Telegram apri **@BotFather** → `/newbot` → scegli nome e username → copia il **token**.
-2. Apri il tuo nuovo bot e premi **Avvia** (o scrivigli "ciao").
-3. Nel browser apri `https://api.telegram.org/bot<TOKEN>/getUpdates` e copia il numero in `"chat":{"id": ...}`.
-4. Crea i secret `TELEGRAM_TOKEN` e `TELEGRAM_CHAT_ID`.
-
-**Email (Gmail)**
-1. Attiva la verifica in due passaggi sull'account Google, poi crea una **password per le app** (myaccount.google.com → Sicurezza → Password per le app).
-2. Crea i secret `EMAIL_USER` (indirizzo Gmail), `EMAIL_PASSWORD` (la password per le app, 16 caratteri) e `EMAIL_TO` (destinatario; se manca usa `EMAIL_USER`).
-
-Per cambiare i filtri modifica le righe `NOTIFICA_*` in `.github/workflows/aggiorna.yml`.
+### Email (Gmail)
+Attiva la verifica in due passaggi su Google, crea una **password per le app** (myaccount.google.com → Sicurezza → Password per le app) e aggiungi i secret `EMAIL_USER`, `EMAIL_PASSWORD`, `EMAIL_TO`. L'email usa gli stessi filtri di Telegram.
 
 ## Se qualcosa non va
 
-- **Il workflow fallisce con "FONTE NON DISPONIBILE"**: inPA non risponde o ha cambiato l'API. Avvia il workflow a mano con *probe* = `si`: nel log trovi un record grezzo da confrontare con i campi usati in `aggiorna.py` (`titolo`, `sedi`, `dataScadenza`, `tipoProcedura`, `allegatoMediaId`, `allegati[].mediaId`).
-- **Etichette sbagliate su un bando**: apri "Perché queste etichette" nella scheda per vedere la frase usata; le regole sono le espressioni regolari `RE_*` in `aggiorna.py`. Dopo averle modificate alza `VERSIONE_CLASSIFICATORE` per far rianalizzare tutto.
-- **Solo Campania**: per analizzare meno PDF imposta `REGIONI: "Campania"` nel workflow (gli altri bandi restano visibili, senza analisi).
+- **"FONTE NON DISPONIBILE"** nel workflow: inPA non risponde o ha cambiato l'API. Avvia il workflow a mano con *probe* = `si` e confronta il record grezzo con i campi usati in `aggiorna.py`.
+- **Etichette sbagliate**: apri "Perché queste etichette" nella scheda del bando; le regole sono le espressioni `RE_*` e `AREE*` in `aggiorna.py`. Dopo averle cambiate alza `VERSIONE_CLASSIFICATORE` e lancia un giro con *max_nuovi* = `2000`.
+- **Il bot non risponde**: controlla nella scheda Actions che *Bot Telegram* giri (GitHub a volte ritarda i giri programmati) e che i secret siano scritti bene.
 
 ## Limiti
 
 - L'API di inPA è pubblica ma **non documentata**: può cambiare senza preavviso.
-- Prove, contratto e lauree sono ricavati dal testo del bando con regole automatiche: le etichette con `?` sono incerte. **Verifica sempre sul bando ufficiale** prima di candidarti.
-- I PDF scansionati (immagini) non sono leggibili: quei bandi risultano "Da verificare".
-- Nel giro dei bandi viene fatta una richiesta ogni ~0,4 secondi, per non pesare sul portale.
+- Prove, contratto e titoli sono ricavati dal testo del bando con regole automatiche: le etichette con `?` e "da verificare" sono incerte. **Verifica sempre sul bando ufficiale.**
+- I PDF scansionati non sono leggibili: quei bandi risultano "da verificare".

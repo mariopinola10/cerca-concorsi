@@ -58,7 +58,7 @@ REGIONI = {r.strip().lower() for r in os.environ.get("REGIONI", "").split(",") i
 PAUSA = 0.4                 # secondi tra una richiesta e l'altra: essere discreti col portale
 MAX_PDF_MB = 20
 MAX_PAGINE_PDF = 60
-VERSIONE_CLASSIFICATORE = 3  # alzala se cambi le regole: i bandi in cache verranno rianalizzati
+VERSIONE_CLASSIFICATORE = 4  # alzala se cambi le regole: i bandi in cache verranno rianalizzati
 
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
@@ -293,6 +293,24 @@ RE_AREE = {k: re.compile(v) for k, v in AREE.items()}
 # false piste tipiche: "conoscenza delle applicazioni informatiche" e' in quasi tutti i bandi
 RE_RUMORE_INFO = re.compile(r"(?:conoscenz\w*|utilizzo|uso)\s+(?:\w+\s+){0,6}(?:informatic|applicazioni|apparecchiature)")
 
+# diploma richiesto: si guarda il testo subito dopo "diploma" (escluso "diploma di laurea")
+RE_DIP_CTX = re.compile(r"diplom[ai](?!\s+(?:di\s+)?laure)(?!\s+accademic)(?!\s+di\s+specializzazione)")
+AREE_DIPLOMA = {
+    "informatica": r"informatic|telecomunicazion|perito\s+(?:industriale\s+)?(?:capotecnico\s+)?(?:per\s+l'|in\s+)?informatic",
+    "elettronica": r"elettronic|elettrotecnic|automazione",
+    "meccanica": r"meccanic|meccatronic|termotecnic",
+    "geometra": r"geometr|costruzioni,?\s+ambiente\s+e\s+territorio|\bc\.?a\.?t\.?\b",
+    "ragioneria": r"ragioner|amministrazione,?\s+finanza\s+e\s+marketing|\bafm\b|perito\s+commercial|tecnico\s+commercial",
+    "agraria": r"agrari|agrotecnic|agroaliment",
+    "chimica": r"chimic|biotecnolog",
+    "socio_sanitario": r"socio[\s-]*sanitari|servizi\s+sociali|dirigente\s+di\s+comunit",
+    "turismo": r"turism|alberghier",
+}
+RE_AREE_DIP = {k: re.compile(v) for k, v in AREE_DIPLOMA.items()}
+RE_DIP_QUALSIASI = re.compile(
+    r"(?:qualsiasi|qualunque|ogni)\s+(?:tipo\s+di\s+)?diploma|diploma\s+di\s+(?:istruzione|scuola)\s+secondaria\s+(?:di\s+secondo\s+grado|superiore)"
+    r"(?:\s*\([^)]{0,40}\))?\s*(?:[,.;]|o\s+equipollente|valido|di\s+durata|quinquennale|conseguit)|altro\s+diploma|diploma\s+di\s+maturit[aà]\s*(?:[,.;]|\(|o\s+equ)")
+
 LIVELLI = {"nessuno": 0, "diploma": 1, "triennale": 2, "magistrale": 3}
 RE_LIV_TRIEN = re.compile(r"laurea\s+triennale|laurea\s+di\s+primo\s+livello|laurea\s+\(l\)|\bl\s*-\s*\d{1,2}\b|laurea\s+breve")
 RE_LIV_MAG = re.compile(r"laurea\s+magistrale|laurea\s+specialistica|vecchio\s+ordinamento|\blm\s*-\s*\d{1,2}\b|\bls\s*-?\s*\d{1,2}\b")
@@ -344,6 +362,18 @@ def classifica_titolo(intestazione: str, t: str) -> dict:
     if classi and all(not c.startswith("L-") for c in classi) and not RE_LIV_TRIEN.search(t) \
             and LIVELLI.get(livello or "nessuno", 0) < 3:
         livello, fonte_liv = "magistrale", "classi"
+    # diplomi: solo se il bando e' di livello diploma (altrimenti "diploma" e' quasi sempre rumore)
+    diplomi, diploma_qualsiasi, m_dip = [], False, None
+    if livello in ("diploma", "nessuno", None):
+        fin_dip = [t[m.start(): m.start() + 260] for m in RE_DIP_CTX.finditer(t)][:80]
+        ctx_dip = " | ".join(RE_RUMORE_INFO.sub(" ", f) for f in fin_dip)
+        diplomi = sorted(k for k, r in RE_AREE_DIP.items() if r.search(ctx_dip))
+        diploma_qualsiasi = bool(RE_DIP_QUALSIASI.search(t)) or not diplomi
+        for f in fin_dip:
+            if any(r.search(RE_RUMORE_INFO.sub(" ", f)) for r in RE_AREE_DIP.values()):
+                m_dip = re.search(r".+", f[:220]); break
+        if m_dip is None and fin_dip:
+            m_dip = re.search(r".+", fin_dip[0][:220])
     m_ev = next((m for m in RE_CLASSE.finditer(t)), None) or m_q or RE_LAUREA_CTX.search(t)
     return {
         "classi": sorted(classi, key=lambda c: (c.split("-")[0] != "L", c)),
@@ -351,7 +381,9 @@ def classifica_titolo(intestazione: str, t: str) -> dict:
         "qualsiasi_laurea": bool(m_q),
         "livello": livello or "non_rilevato",
         "livello_da": fonte_liv,
-        "perche": estratto(t, m_ev) if m_ev else "",
+        "diplomi": diplomi,
+        "diploma_qualsiasi": diploma_qualsiasi,
+        "perche": (m_dip.group(0) + "…") if (m_dip and livello in ("diploma", "nessuno")) else (estratto(t, m_ev) if m_ev else ""),
     }
 
 

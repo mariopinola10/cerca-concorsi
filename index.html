@@ -52,7 +52,8 @@
   .btn { border: 1px solid var(--acc); background: var(--acc); color: #fff; border-radius: 10px; padding: 9px 14px; font-size: 15px; font-weight: 600; cursor: pointer; white-space: nowrap; }
   @media (prefers-color-scheme: dark) { .btn { color: #0e1a26; } }
   .btn.sec { background: transparent; color: var(--acc); }
-  .chk { display: flex; align-items: center; gap: 8px; font-size: 14.5px; margin-top: 8px; }
+  .chk, .grp > label.chk { display: flex; align-items: center; gap: 8px; font-size: 14.5px; margin-top: 8px;
+    text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--txt); }
   .msg { font-size: 13px; color: var(--bad); margin: 6px 2px 0; min-height: 0; }
   .bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 6px 2px 10px; font-size: 13.5px; color: var(--muted); flex-wrap: wrap; }
   .bar button.link { background: none; border: none; color: var(--acc); font-size: 13.5px; cursor: pointer; padding: 0; }
@@ -266,7 +267,7 @@ function cercaTitolo(testo) {
   const trovati = tutti.filter(([k, n]) => (k + " " + n).toLowerCase().includes(q));
   if (trovati.length === 1) return { cod: trovati[0][0] };
   if (!trovati.length) return { err: `Nessun titolo trovato per «${t}». Prova con la classe, es. L-9.` };
-  return { err: `Più titoli per «${t}»: ${trovati.slice(0, 5).map(([k, n]) => k + " " + n).join(", ")}${trovati.length > 5 ? "…" : ""}. Sii più preciso o scegli dall'elenco.` };
+  return { err: `Più titoli per «${t}»: ${trovati.slice(0, 5).map(([k, n]) => k + " " + n).join(", ")}${trovati.length > 5 ? "…" : ""} — scrivi meglio o scegli dall'elenco.` };
 }
 function etichettaTitolo(c) { return DIPLOMI[c] ? DIPLOMI[c][1] : c + (CLASSI[c] ? " " + CLASSI[c] : ""); }
 function brevetitolo(c) { return DIPLOMI[c] ? DIPLOMI[c][1] : c; }
@@ -298,7 +299,7 @@ function compatibile(b, tit) {
     return "forse";
   }
   if (t.classi.includes(tit) || t.qualsiasi_laurea) return "si";
-  if (area && t.aree.includes(area)) return "forse";
+  if (area && (t.aree.includes(area) || t.classi.some(c => AREA_CLASSE[c] === area))) return "forse";
   if (t.classi.length || t.aree.length) return "no";
   return "?";
 }
@@ -495,7 +496,7 @@ function disegnaNotifiche(nRis) {
   let cod = codiceFiltri(), avviso = "";
   if (cod.length > 64) { avviso = "<br>⚠️ Troppi filtri per un solo link: togli qualche titolo."; cod = ""; }
   const extra = (F.q || F.categoria || Number(F.scadmin) > 0) ? "<br><i>Ricerca libera, tipo e scadenza non valgono per le notifiche.</i>" : "";
-  const att = NOTIF.filtri ? `Notifiche attuali${NOTIF.pausa ? " (in pausa)" : ""}: ${esc(descriviFiltri.call(null, NOTIF.filtri))}` : "";
+  const att = NOTIF.filtri ? `Notifiche attuali${NOTIF.pausa ? " (in pausa)" : ""}: ${esc(descriviFiltriSalvati(NOTIF.filtri))}` : "";
   el.innerHTML = `🔔 <b>Notifiche Telegram</b> per i concorsi <b>nuovi</b> con questi filtri:<br>${esc(descriviFiltri())} — oggi ${nRis} bandi.${extra}${avviso}
     ${cod ? `<a class="btn" href="https://t.me/${esc(NOTIF.bot)}?start=${encodeURIComponent(cod)}" target="_blank" rel="noopener">🔔 Usa questi filtri per le notifiche</a>
     <div class="att">Si apre Telegram: premi <b>Avvia</b>. Il bot conferma entro 10-20 minuti.</div>` : ""}
@@ -571,15 +572,15 @@ function collega() {
   if (matchMedia("(max-width: 600px)").matches && ls.get("filtri", null)) $("pannello").open = false;
 }
 
-// descriviFiltri per i filtri salvati dal bot (stesso formato di filtri.py)
-descriviFiltri.call = (_, f) => {
+// descrizione dei filtri salvati dal bot (stesso formato di filtri.py)
+function descriviFiltriSalvati(f) {
   const p = [(f.regioni || []).join("/") || "Tutte le regioni"];
   if ((f.prove || []).length) p.push(f.prove.map(x => ETICHETTE.prove[x] || x).join("/"));
   if ((f.contratto || []).length) p.push(f.contratto.map(x => ETICHETTE.contratto[x] || x).join("/"));
   if ((f.titoli || []).length) p.push(f.titoli.map(brevetitolo).join(", ") + (f.verificare === false ? " (solo certi)" : " (anche da verificare)"));
   if (f.nopres) p.push("senza preselettiva");
   return p.join(" · ");
-};
+}
 
 async function avvia() {
   collega();
