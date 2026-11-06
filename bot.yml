@@ -1,17 +1,22 @@
-# Bot Telegram: ogni ~10 minuti legge i messaggi arrivati al bot (comandi e link dei filtri dalla pagina),
-# risponde e salva i filtri delle notifiche in data/notifiche.json.
+# Bot Telegram: risponde ai messaggi (comandi e link dei filtri dalla pagina) e salva i filtri
+# delle notifiche in data/notifiche.json.
+# - con il Worker Cloudflare (cloudflare/worker.js) parte subito a ogni messaggio (repository_dispatch);
+# - senza Worker legge i messaggi in coda ogni ~15 minuti (GitHub puo' ritardare i giri programmati).
 name: Bot Telegram
 
 on:
+  repository_dispatch:
+    types: [telegram]
   schedule:
-    - cron: "*/10 * * * *"   # GitHub puo' ritardare i giri di qualche minuto
+    - cron: "*/15 * * * *"
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: bot-telegram
+  # ogni messaggio dal Worker ha il suo run (nessun messaggio scartato); i giri programmati non si sovrappongono
+  group: bot-${{ github.event_name == 'repository_dispatch' && github.run_id || 'coda' }}
   cancel-in-progress: false
 
 jobs:
@@ -19,9 +24,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 

@@ -15,7 +15,7 @@ Pagina per cercare i concorsi pubblici aperti su [inPA](https://www.inpa.gov.it)
 |---|---|---|
 | `aggiorna.py` | GitHub Actions, 4 volte al giorno | Legge i bandi aperti da inPA, scarica il PDF dei bandi **nuovi** e ne ricava prove, contratto, lauree e diplomi richiesti → `data/bandi.json` |
 | `notifica.py` | subito dopo `aggiorna.py` | Manda su Telegram/email i bandi nuovi che rispettano i filtri delle notifiche |
-| `bot.py` | GitHub Actions, ogni ~10 minuti | Legge i messaggi al bot Telegram (filtri inviati dalla pagina, comandi) e risponde |
+| `bot.py` | GitHub Actions, a ogni messaggio (con il Worker) o ogni ~15 minuti | Legge i messaggi al bot Telegram (filtri inviati dalla pagina, comandi) e risponde |
 | `ai.py` | dentro `aggiorna.py` | Lettura dei bandi con Gemini (gratuito, facoltativo) |
 | `filtri.py` | – | Logica comune dei filtri (la stessa è replicata in `index.html`) |
 | `index.html` | GitHub Pages | La pagina con i filtri |
@@ -50,7 +50,15 @@ Nella scheda del bando, "Perché queste etichette" mostra 🤖 quando l'analisi 
 4. Settings → Secrets and variables → Actions → crea i secret `TELEGRAM_TOKEN` e `TELEGRAM_CHAT_ID`.
 5. Actions → *Bot Telegram* → **Run workflow** una volta: da quel momento la pagina mostra il pulsante 🔔.
 
-**Scegliere i filtri delle notifiche**: imposta i filtri sulla pagina e tocca **🔔 Usa questi filtri per le notifiche**. Si apre Telegram: premi **Avvia**. Entro 10-20 minuti il bot conferma i filtri ed elenca i bandi già aperti che li rispettano; da lì in poi ti scrive solo per quelli nuovi. Ricerca libera, tipo e scadenza non valgono per le notifiche.
+**Risposte immediate (facoltativo, gratis)**: senza altro il bot legge i messaggi ogni ~15 minuti (GitHub può ritardare). Con il Worker in `cloudflare/worker.js` risponde subito "⏳ Ricevuto" e dopo circa un minuto con il risultato:
+1. Token GitHub: github.com → foto profilo → Settings → Developer settings → Personal access tokens → **Fine-grained tokens** → Generate new token. Repository access: *Only select repositories* → `cerca-concorsi`. Permissions → Repository → **Contents: Read and write**. Copia il token (`github_pat_…`).
+2. Cloudflare (account gratuito su dash.cloudflare.com) → **Workers & Pages** → Create → *Start with Hello World* → nome `cerca-concorsi-bot` → Deploy → **Edit code** → incolla `cloudflare/worker.js` → Deploy. Annota l'indirizzo `https://cerca-concorsi-bot.<tuo-nome>.workers.dev`.
+3. Nel Worker: Settings → **Variables and Secrets** → aggiungi come *Secret* `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`, `GITHUB_TOKEN`, `WEBHOOK_SECRET` (una parola inventata, solo lettere, numeri, `_` e `-`) e come *Text* `GITHUB_REPO` = `utente/cerca-concorsi` → Deploy.
+4. Collega Telegram al Worker aprendo nel browser:
+   `https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://cerca-concorsi-bot.<tuo-nome>.workers.dev&secret_token=<WEBHOOK_SECRET>`
+   Deve rispondere `"Webhook was set"`. Per tornare indietro: `https://api.telegram.org/bot<TOKEN>/deleteWebhook`.
+
+**Scegliere i filtri delle notifiche**: imposta i filtri sulla pagina e tocca **🔔 Usa questi filtri per le notifiche**. Si apre Telegram: premi **Avvia**. Il bot conferma (subito con il Worker, altrimenti entro 15-30 minuti) i filtri ed elenca i bandi già aperti che li rispettano; da lì in poi ti scrive solo per quelli nuovi. Ricerca libera, tipo e scadenza non valgono per le notifiche.
 
 Comandi del bot: `/filtri` (filtri attuali), `/bandi` (elenco dei bandi aperti che li rispettano), `/pausa`, `/riprendi`, `/aiuto`.
 Il bot risponde solo alla tua chat.
