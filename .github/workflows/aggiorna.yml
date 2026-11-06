@@ -1,4 +1,5 @@
-# Aggiorna i bandi aperti da inPA e li salva in data/bandi.json (letto da index.html).
+# Aggiorna i bandi aperti da inPA, li salva in data/bandi.json (letto da index.html)
+# e manda le notifiche dei bandi nuovi (Telegram/email) secondo i filtri NOTIFICA_*.
 # Gira da solo 4 volte al giorno; si può avviare a mano da Actions -> "Aggiorna concorsi" -> Run workflow.
 name: Aggiorna concorsi
 
@@ -33,18 +34,37 @@ jobs:
           python-version: "3.12"
 
       - name: Dipendenze
-        run: pip install requests pypdf
+        run: pip install requests pypdf fonttools
 
       - name: Diagnostica API
         if: ${{ github.event.inputs.probe == 'si' }}
         run: python aggiorna.py --probe
 
       - name: Scarica e analizza i bandi
+        id: aggiorna
         if: ${{ github.event.inputs.probe != 'si' }}
         env:
           MAX_NUOVI: ${{ github.event.inputs.max_nuovi || '400' }}
           REGIONI: ""          # es. "Campania" per analizzare i PDF solo di quella regione
         run: python aggiorna.py
+
+      - name: Notifiche bandi nuovi
+        if: ${{ steps.aggiorna.outcome == 'success' }}
+        env:
+          # --- i tuoi filtri (modificali qui) ---
+          NOTIFICA_REGIONI: "Campania"
+          NOTIFICA_LAUREA: "L-31"
+          NOTIFICA_COMPAT: "forse"          # "si" = solo compatibili certi, "forse" = anche da verificare
+          NOTIFICA_PROVE: ""                # es. "solo_scritto,scritto_orale"
+          NOTIFICA_CONTRATTO: ""            # es. "indeterminato"
+          NOTIFICA_NO_PRESELETTIVA: "0"     # "1" = escludi bandi con preselettiva
+          # --- canali: si configurano in Settings -> Secrets and variables -> Actions ---
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+        run: python notifica.py
 
       - name: Salva i dati nel repository
         if: ${{ always() && github.event.inputs.probe != 'si' }}
@@ -56,5 +76,6 @@ jobs:
             echo "Nessuna novita'"
           else
             git commit -m "Aggiornamento bandi $(date -u +'%Y-%m-%d %H:%M') UTC"
+            git pull --rebase origin main
             git push
           fi
