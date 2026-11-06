@@ -111,6 +111,17 @@
         <div class="hint">Con almeno un titolo vedi solo i bandi a cui puoi accedere con uno di essi.</div>
       </div>
 
+      <div class="grp"><span class="lbl">Le mie idoneità in graduatoria</span>
+        <div class="chips" id="idoneita"></div>
+        <div class="addrow">
+          <select id="idliv" style="flex:1.2;min-width:0"><option value="F">Funzionario</option><option value="I">Istruttore</option><option value="O">Operatore</option><option value="D">Dirigente</option></select>
+          <select id="idarea" style="flex:1.2;min-width:0"></select>
+          <button class="btn" id="addid" type="button">Aggiungi</button>
+        </div>
+        <label class="chk"><input type="checkbox" id="grad"> Mostra gli avvisi per idonei in graduatorie di altri enti</label>
+        <div class="hint">Per questi avvisi conta l'idoneità nel profilo richiesto, non il titolo di studio.</div>
+      </div>
+
       <div class="grp"><span class="lbl">Regioni</span>
         <div class="chips" id="regioni"></div>
         <select id="addreg" style="margin-top:8px"></select>
@@ -235,6 +246,48 @@ const LAUREA_DIPLOMA = { informatica: ["informatica"], ingegneria: ["informatica
   architettura: ["geometra"], economia: ["ragioneria"], scienze: ["agraria", "chimica"],
   servizio_sociale: ["socio_sanitario"], sanita: ["socio_sanitario", "chimica"] };
 const LIV = { nessuno: 0, diploma: 1, triennale: 2, magistrale: 3 };
+// ---- avvisi per idonei in graduatorie di altri enti (riconosciuti dal titolo; stessa logica in filtri.py)
+const RE_GRAD = /idone[io]|utilizz\w*\s+(?:di\s+)?(?:idonei\s+)?(?:delle\s+|di\s+)?graduatori|scorriment\w*\s+(?:di\s+|delle\s+)?graduatori|graduatori\w*\s+(?:\S+\s+){0,6}(?:da|di)\s+altr[ie]\s+(?:enti|amministrazioni|pp\.?\s*aa)/;
+const LIV_PROF = [["D", /dirigent/], ["F", /funzionari|direttiv|specialist|\bcat(?:egoria)?\.?\s*d\b|area\s+(?:dei\s+)?funzionari/],
+  ["I", /\bistr(?:\.|uttor)|\bcat(?:egoria)?\.?\s*c\b|area\s+(?:degli\s+)?istruttori|agent[ei]\s+di\s+polizia/],
+  ["O", /operator|esecutor|collaborator|\bcat(?:egoria)?\.?\s*b\b|area\s+(?:degli\s+)?operatori/]];
+const AREE_PROF = { INF: ["informatico", /informatic|sistemi\s+informativ|\bict\b|digital|programmator|analista/],
+  CON: ["contabile", /contabil|finanziar|ragioner|economic|tribut/], AMM: ["amministrativo", /amministrativ/],
+  TEC: ["tecnico", /tecnic|geometr|ingegner|architett|lavori\s+pubblici/], VIG: ["vigilanza", /vigilanza|polizia\s+locale|agent[ei]\s+di\s+p/],
+  SOC: ["sociale/educativo", /social|educator|pedagog/], CUL: ["culturale/biblioteca", /bibliotec|cultural|archivist|museal/],
+  COM: ["comunicazione", /comunicazion|giornalist|ufficio\s+stampa/] };
+const NOMI_LIV = { D: "Dirigente", F: "Funzionario", I: "Istruttore", O: "Operatore" };
+function graduatoria(b) {
+  const t = (b.titolo + " . " + b.profilo).toLowerCase();
+  if (!RE_GRAD.test(t)) return null;
+  const liv = (LIV_PROF.find(([, r]) => r.test(t)) || [""])[0];
+  const aree = Object.keys(AREE_PROF).filter(k => AREE_PROF[k][1].test(t));
+  const nome = ((NOMI_LIV[liv] || "Profilo") + " " + aree.map(a => AREE_PROF[a][0]).join("/")).trim();
+  return { liv, aree, nome };
+}
+function nomeIdoneita(c) { return (NOMI_LIV[c[0]] || "") + " " + (AREE_PROF[c.slice(1)] || [c.slice(1)])[0]; }
+function compatIdoneita(g, idon) {
+  let best = ["no", ""];
+  for (const c of idon) {
+    const liv = c[0], area = c.slice(1);
+    const stessaArea = g.aree.includes(area), stessoLiv = g.liv === liv;
+    const k = (stessaArea && stessoLiv) ? "si" : ((stessaArea && !g.liv) || (stessoLiv && !g.aree.length) || (stessaArea && g.liv && !stessoLiv)) ? "forse" : "no";
+    if (RANGO[k] > RANGO[best[0]]) best = [k, c];
+  }
+  return best;
+}
+// esito complessivo per un bando: [esito, testo del badge] oppure null se non ci sono filtri sui requisiti
+function valuta(b) {
+  const g = graduatoria(b);
+  if (g) {
+    if (!F.idoneita.length) return ["?", "Serve idoneità: " + g.nome];
+    const [k, c] = compatIdoneita(g, F.idoneita);
+    return [k, k === "si" ? "✓ idoneo " + nomeIdoneita(c) : k === "forse" ? "Da verificare: idoneità " + g.nome : "Serve idoneità: " + g.nome];
+  }
+  if (!F.titoli.length) return null;
+  const [k, tit] = compatMigliore(b, F.titoli);
+  return [k, k === "si" ? "✓ " + brevetitolo(tit) : k === "forse" ? "Da verificare: " + brevetitolo(tit) : k === "?" ? "Titolo da verificare" : "Non per i tuoi titoli"];
+}
 const RANGO = { si: 3, forse: 2, "?": 1, no: 0 };
 const PASSO = 60;
 const RAPIDI = ["DIP-INF", "DIP", "L-31", "L-8", "L-9"];
@@ -316,9 +369,10 @@ function compatMigliore(b, titoli) {
 
 // ======================= stato =======================
 const DEFAULT = { q: "", regioni: ["Campania"], categoria: "", prove: [], contratto: [], nopres: false,
-                  titoli: ["L-31"], verificare: true, ordina: "scadenza", scadmin: 0 };
+                  titoli: ["L-31"], verificare: true, idoneita: [], grad: true, ordina: "scadenza", scadmin: 0 };
 let F = Object.assign({}, DEFAULT, ls.get("filtri", {}));
 if (!Array.isArray(F.titoli)) F.titoli = [];
+if (!Array.isArray(F.idoneita)) F.idoneita = [];
 if (!Array.isArray(F.regioni)) F.regioni = F.regione ? [F.regione] : [];   // vecchia versione: una sola regione
 delete F.regione;
 if (F.mialaurea) {    // vecchia versione della pagina: un solo titolo
@@ -361,8 +415,10 @@ function passa(b, ignora) {
     const v = a ? a.contratto.contratto : "non_rilevato";
     if (!(F.contratto.includes(v) || (v === "entrambi" && F.contratto.some(x => x === "indeterminato" || x === "determinato")))) return false;
   }
-  if (F.titoli.length) {
-    const [k] = compatMigliore(b, F.titoli);
+  const gr = graduatoria(b);
+  if (gr && !F.grad) return false;
+  if (gr || F.titoli.length) {
+    const [k] = valuta(b);
     if (k === "no" || (!F.verificare && k !== "si")) return false;
   }
   if (F.q) {
@@ -405,6 +461,11 @@ function selectOpzioni(el, campo, conteggi, tuttiLabel) {
   el.innerHTML = `<option value="">${esc(tuttiLabel)}</option>` +
     chiavi.map(k => `<option value="${esc(k)}"${k === F[campo] ? " selected" : ""}>${esc(k)} (${conteggi[k] || 0})</option>`).join("");
 }
+function disegnaIdoneita() {
+  $("idoneita").innerHTML = F.idoneita.length
+    ? F.idoneita.map(c => `<button type="button" class="chip tit" data-k="${esc(c)}" title="Rimuovi">${esc(nomeIdoneita(c))}<span class="x">✕</span></button>`).join("")
+    : `<span class="meta">Nessuna: gli avvisi per idonei restano «da verificare».</span>`;
+}
 function disegnaTitoli() {
   $("titoli").innerHTML = F.titoli.length
     ? F.titoli.map(c => `<button type="button" class="chip tit" data-k="${esc(c)}" title="Rimuovi">${esc(etichettaTitolo(c))}<span class="x">✕</span></button>`).join("")
@@ -428,24 +489,22 @@ function scheda(b) {
   let bad = "", why = "";
   if (a) {
     const p = a.prove, c = a.contratto, t = a.titolo;
+    const gr = graduatoria(b);
+    if (gr) bad += badge("p", "Idonei in graduatoria · " + gr.nome);
     bad += badge("p", p.prove === "non_rilevato" ? "Prove da verificare" : (ETICHETTE.prove[p.prove] || p.prove), p.conf === "bassa" && p.prove !== "non_rilevato");
     if (p.preselettiva) bad += badge("warn", "Preselettiva");
     if (p.pratica) bad += badge("", "Prova pratica");
     bad += badge("", c.contratto === "non_rilevato" ? "Contratto da verificare" : (ETICHETTE.contratto[c.contratto] || c.contratto), c.conf === "bassa" && c.contratto !== "non_rilevato");
     if (c.part_time) bad += badge("", "Part-time");
-    if (t.livello in ETICHETTE.livello) {
+    if (!gr && t.livello in ETICHETTE.livello) {
       const dip = t.livello === "diploma" && (t.diplomi || []).length && !t.diploma_qualsiasi
         ? " " + t.diplomi.map(d => ETICHETTE.diplomi[d] || d).join("/") : "";
       bad += badge("", ETICHETTE.livello[t.livello] + dip);
     }
-    if (t.classi.length) bad += badge("", t.classi.slice(0, 6).join(" · ") + (t.classi.length > 6 ? " …" : ""));
+    if (!gr && t.classi.length) bad += badge("", t.classi.slice(0, 6).join(" · ") + (t.classi.length > 6 ? " …" : ""));
     if (t.qualsiasi_laurea) bad += badge("", "Qualsiasi laurea");
-    if (F.titoli.length) {
-      const [k, tit] = compatMigliore(b, F.titoli);
-      if (k === "si") bad += badge("ok", "✓ " + brevetitolo(tit));
-      else if (k === "forse") bad += badge("warn", "Da verificare: " + brevetitolo(tit));
-      else if (k === "?") bad += badge("warn", "Titolo da verificare");
-    }
+    const v = valuta(b);
+    if (v) bad += badge(v[0] === "si" ? "ok" : v[0] === "no" ? "bad" : "warn", v[1]);
     const righe = [];
     if (p.perche) righe.push(`<p><b>Prove:</b> ${esc(p.perche)}</p>`);
     if (c.perche) righe.push(`<p><b>Contratto:</b> ${esc(c.perche)}</p>`);
@@ -454,6 +513,8 @@ function scheda(b) {
     if (!a.pdf_letto) righe.push(`<p>Il PDF del bando non è stato letto (assente o scansionato): dati parziali.</p>`);
     if (righe.length) why = `<details class="why"><summary>Perché queste etichette</summary>${righe.join("")}</details>`;
   } else {
+    const gr = graduatoria(b);
+    if (gr) bad += badge("p", "Idonei in graduatoria · " + gr.nome);
     bad += badge("warn", "Analisi in corso");
   }
   const sc = g === null ? "" : `<span class="scad${g < 7 ? " urg" : ""}">Scade ${fmtData(b.scadenza)}${g >= 0 && g < 30 ? ` (${Math.max(0, Math.floor(g))} gg)` : ""}</span>`;
@@ -483,6 +544,8 @@ function codiceFiltri() {
   if (F.prove.length) p.push("P" + F.prove.map(x => CODICI_PROVE[x]).join(""));
   if (F.contratto.length) p.push("C" + F.contratto.map(x => CODICI_CONTR[x]).join(""));
   if (F.titoli.length) p.push("T" + F.titoli.map(c => DIPLOMI[c] ? (c === "DIP" ? "D" : "D" + c.slice(4)) : c.replace(/-/g, "")).join("-"));
+  if (F.idoneita.length) p.push("I" + F.idoneita.join("-"));
+  if (!F.grad) p.push("G0");
   if (!F.verificare) p.push("VS");
   if (F.nopres) p.push("X");
   return p.join("_");
@@ -492,6 +555,8 @@ function descriviFiltri() {
   if (F.prove.length) p.push(F.prove.map(x => ETICHETTE.prove[x]).join("/"));
   if (F.contratto.length) p.push(F.contratto.map(x => ETICHETTE.contratto[x]).join("/"));
   if (F.titoli.length) p.push(F.titoli.map(brevetitolo).join(", ") + (F.verificare ? " (anche da verificare)" : " (solo certi)"));
+  if (F.idoneita.length) p.push("idoneo " + F.idoneita.map(nomeIdoneita).join(", "));
+  if (!F.grad) p.push("senza avvisi per idonei");
   if (F.nopres) p.push("senza preselettiva");
   return p.join(" · ");
 }
@@ -516,6 +581,7 @@ function disegnaNotifiche(nRis) {
 // ======================= ciclo principale =======================
 function disegna() {
   disegnaTitoli();
+  disegnaIdoneita();
   const cr = conta("regione", b => b.regione);
   $("regioni").innerHTML = F.regioni.length
     ? F.regioni.map(r => `<button type="button" class="chip tit" data-k="${esc(r)}" title="Rimuovi">${esc(r)} <span class="n">${cr[r] || 0}</span><span class="x">✕</span></button>`).join("")
@@ -555,6 +621,17 @@ function collega() {
   set("categoria", "categoria");
   set("nopres", "nopres");
   set("verificare", "verificare");
+  set("grad", "grad");
+  $("idarea").innerHTML = Object.entries(AREE_PROF).map(([k, v]) => `<option value="${k}">${esc(v[0])}</option>`).join("");
+  $("idliv").value = "F"; $("idarea").value = "INF";
+  $("addid").onclick = () => {
+    const c = $("idliv").value + $("idarea").value;
+    if (!F.idoneita.includes(c)) { F.idoneita = F.idoneita.concat(c); salva(); disegna(); }
+  };
+  $("idoneita").onclick = e => {
+    const c = e.target.closest(".chip.tit"); if (!c) return;
+    F.idoneita = F.idoneita.filter(x => x !== c.dataset.k); salva(); disegna();
+  };
   set("ordina", "ordina");
   set("scadmin", "scadmin");
 
@@ -587,8 +664,8 @@ function collega() {
     F.titoli = F.titoli.concat(c.dataset.k); salva(); disegna();
   };
   $("reset").onclick = () => {
-    F = Object.assign({}, DEFAULT, { titoli: F.titoli, regioni: F.regioni });
-    ["q", "nopres", "verificare", "ordina", "scadmin"].forEach(id => {
+    F = Object.assign({}, DEFAULT, { titoli: F.titoli, regioni: F.regioni, idoneita: F.idoneita });
+    ["q", "nopres", "verificare", "grad", "ordina", "scadmin"].forEach(id => {
       const el = $(id); if (el.type === "checkbox") el.checked = !!F[id]; else el.value = F[id];
     });
     salva(); disegna();
@@ -602,6 +679,8 @@ function descriviFiltriSalvati(f) {
   if ((f.prove || []).length) p.push(f.prove.map(x => ETICHETTE.prove[x] || x).join("/"));
   if ((f.contratto || []).length) p.push(f.contratto.map(x => ETICHETTE.contratto[x] || x).join("/"));
   if ((f.titoli || []).length) p.push(f.titoli.map(brevetitolo).join(", ") + (f.verificare === false ? " (solo certi)" : " (anche da verificare)"));
+  if ((f.idoneita || []).length) p.push("idoneo " + f.idoneita.map(nomeIdoneita).join(", "));
+  if (f.grad === false) p.push("senza avvisi per idonei");
   if (f.nopres) p.push("senza preselettiva");
   return p.join(" · ");
 }

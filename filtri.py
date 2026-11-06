@@ -77,6 +77,69 @@ LAUREA_DIPLOMA = {"informatica": ["informatica"], "ingegneria": ["informatica", 
                   "servizio_sociale": ["socio_sanitario"], "sanita": ["socio_sanitario", "chimica"]}
 RANGO = {"si": 3, "forse": 2, "?": 1, "no": 0}
 
+# avvisi per idonei in graduatorie di altri enti (riconosciuti dal titolo; stessa logica in index.html)
+RE_GRAD = re.compile(r"idone[io]|utilizz\w*\s+(?:di\s+)?(?:idonei\s+)?(?:delle\s+|di\s+)?graduatori|"
+                     r"scorriment\w*\s+(?:di\s+|delle\s+)?graduatori|"
+                     r"graduatori\w*\s+(?:\S+\s+){0,6}(?:da|di)\s+altr[ie]\s+(?:enti|amministrazioni|pp\.?\s*aa)")
+LIV_PROF = [("D", re.compile(r"dirigent")),
+            ("F", re.compile(r"funzionari|direttiv|specialist|\bcat(?:egoria)?\.?\s*d\b|area\s+(?:dei\s+)?funzionari")),
+            ("I", re.compile(r"\bistr(?:\.|uttor)|\bcat(?:egoria)?\.?\s*c\b|area\s+(?:degli\s+)?istruttori|agent[ei]\s+di\s+polizia")),
+            ("O", re.compile(r"operator|esecutor|collaborator|\bcat(?:egoria)?\.?\s*b\b|area\s+(?:degli\s+)?operatori"))]
+AREE_PROF = {"INF": ("informatico", re.compile(r"informatic|sistemi\s+informativ|\bict\b|digital|programmator|analista")),
+             "CON": ("contabile", re.compile(r"contabil|finanziar|ragioner|economic|tribut")),
+             "AMM": ("amministrativo", re.compile(r"amministrativ")),
+             "TEC": ("tecnico", re.compile(r"tecnic|geometr|ingegner|architett|lavori\s+pubblici")),
+             "VIG": ("vigilanza", re.compile(r"vigilanza|polizia\s+locale|agent[ei]\s+di\s+p")),
+             "SOC": ("sociale/educativo", re.compile(r"social|educator|pedagog")),
+             "CUL": ("culturale/biblioteca", re.compile(r"bibliotec|cultural|archivist|museal")),
+             "COM": ("comunicazione", re.compile(r"comunicazion|giornalist|ufficio\s+stampa"))}
+NOMI_LIV = {"D": "Dirigente", "F": "Funzionario", "I": "Istruttore", "O": "Operatore"}
+
+
+def graduatoria(b: dict) -> dict | None:
+    t = f"{b.get('titolo', '')} . {b.get('profilo', '')}".lower()
+    if not RE_GRAD.search(t):
+        return None
+    liv = next((k for k, r in LIV_PROF if r.search(t)), "")
+    aree = [k for k, (_, r) in AREE_PROF.items() if r.search(t)]
+    nome = f"{NOMI_LIV.get(liv, 'Profilo')} {'/'.join(AREE_PROF[a][0] for a in aree)}".strip()
+    return {"liv": liv, "aree": aree, "nome": nome}
+
+
+def nome_idoneita(c: str) -> str:
+    return f"{NOMI_LIV.get(c[:1], '')} {AREE_PROF.get(c[1:], (c[1:],))[0]}".strip()
+
+
+def compat_idoneita(g: dict, idon: list[str]) -> tuple[str, str]:
+    best = ("no", "")
+    for c in idon:
+        liv, area = c[:1], c[1:]
+        stessa_area, stesso_liv = area in g["aree"], g["liv"] == liv
+        if stessa_area and stesso_liv:
+            k = "si"
+        elif (stessa_area and not g["liv"]) or (stesso_liv and not g["aree"]) or (stessa_area and g["liv"] and not stesso_liv):
+            k = "forse"
+        else:
+            k = "no"
+        if RANGO[k] > RANGO[best[0]]:
+            best = (k, c)
+    return best
+
+
+def valuta(b: dict, f: dict) -> tuple[str, str] | None:
+    """(esito, descrizione) rispetto a titoli e idoneita' dell'utente; None se non ci sono filtri sui requisiti"""
+    g = graduatoria(b)
+    if g:
+        idon = f.get("idoneita") or []
+        if not idon:
+            return "?", f"serve idoneità: {g['nome']}"
+        k, c = compat_idoneita(g, idon)
+        return k, {"si": f"idoneo {nome_idoneita(c)}", "forse": f"idoneità da verificare: {g['nome']}"}.get(k, f"serve idoneità: {g['nome']}")
+    if not f.get("titoli"):
+        return None
+    k, tit = compat_migliore(b, f["titoli"])
+    return k, {"si": etichetta_titolo(tit), "forse": f"{etichetta_titolo(tit)} da verificare", "?": "titolo da verificare"}.get(k, "")
+
 
 # ----------------------------------------------------------------------------- titoli
 def norm_titolo(s: str) -> str:
@@ -166,8 +229,12 @@ def passa(b: dict, f: dict) -> bool:
         c = a["contratto"]["contratto"]
         if not (c in f["contratto"] or (c == "entrambi" and {"indeterminato", "determinato"} & set(f["contratto"]))):
             return False
-    if f.get("titoli"):
-        k, _ = compat_migliore(b, f["titoli"])
+    g = graduatoria(b)
+    if g and f.get("grad") is False:
+        return False
+    v = valuta(b, f)
+    if v:
+        k = v[0]
         if k == "no" or (not f.get("verificare", True) and k != "si"):
             return False
     return True
@@ -182,13 +249,17 @@ def descrivi_filtri(f: dict) -> str:
     if f.get("titoli"):
         parti.append(", ".join(etichetta_titolo(t) for t in f["titoli"])
                      + (" (anche da verificare)" if f.get("verificare", True) else " (solo certi)"))
+    if f.get("idoneita"):
+        parti.append("idoneo " + ", ".join(nome_idoneita(c) for c in f["idoneita"]))
+    if f.get("grad") is False:
+        parti.append("senza avvisi per idonei")
     if f.get("nopres"):
         parti.append("senza preselettiva")
     return " · ".join(parti)
 
 
 def decodifica(codice: str) -> dict | None:
-    f = {"regioni": [], "prove": [], "contratto": [], "titoli": [], "verificare": True, "nopres": False}
+    f = {"regioni": [], "prove": [], "contratto": [], "titoli": [], "idoneita": [], "grad": True, "verificare": True, "nopres": False}
     inv_reg = {v: k for k, v in REGIONI.items()}
     inv_pro = {v: k for k, v in CODICI_PROVE.items()}
     inv_con = {v: k for k, v in CODICI_CONTR.items()}
@@ -211,6 +282,10 @@ def decodifica(codice: str) -> dict | None:
                     elif x:
                         tit.append(norm_titolo(x))
                 f["titoli"] = [t for t in tit if t in DIPLOMI or livello_titolo(t)]
+            elif k == "I":
+                f["idoneita"] = [x for x in v.split("-") if x[:1] in NOMI_LIV and x[1:] in AREE_PROF]
+            elif tok == "G0":
+                f["grad"] = False
             elif tok == "VS":
                 f["verificare"] = False
             elif tok == "X":
@@ -274,16 +349,16 @@ def fmt_data(s: str) -> str:
 def scheda(b: dict, f: dict) -> dict:
     a = b["analisi"]
     p, c = a["prove"], a["contratto"]
-    tag = [ETICHETTE_PROVE.get(p["prove"], p["prove"]) + (" (incerto)" if p["conf"] == "bassa" and p["prove"] != "non_rilevato" else "")]
+    g = graduatoria(b)
+    tag = ([f"Idonei in graduatoria · {g['nome']}"] if g else []) + [ETICHETTE_PROVE.get(p["prove"], p["prove"]) + (" (incerto)" if p["conf"] == "bassa" and p["prove"] != "non_rilevato" else "")]
     if p["preselettiva"]:
         tag.append("preselettiva")
     tag.append(ETICHETTE_CONTR.get(c["contratto"], c["contratto"]))
     icona = ""
-    if f.get("titoli"):
-        k, tit = compat_migliore(b, f["titoli"])
-        icona = {"si": "✅", "forse": "🔎", "?": "🔎"}.get(k, "")
-        tag.append({"si": f"✅ {etichetta_titolo(tit)}", "forse": f"🔎 {etichetta_titolo(tit)} da verificare",
-                    "?": "🔎 titolo da verificare"}.get(k, ""))
+    v = valuta(b, f)
+    if v:
+        icona = {"si": "✅", "forse": "🔎", "?": "🔎"}.get(v[0], "")
+        tag.append(f"{icona} {v[1]}".strip())
     sede = ", ".join((b.get("sedi") or [])[1:]) or b.get("regione", "")
     return {"titolo": b.get("titolo") or b.get("profilo") or "Bando", "ente": b.get("ente", ""), "sede": sede,
             "posti": b.get("posti"), "scadenza": fmt_data(b.get("scadenza", "")), "tag": " · ".join(t for t in tag if t),

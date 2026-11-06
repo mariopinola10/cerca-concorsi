@@ -5,6 +5,7 @@ Pagina per cercare i concorsi pubblici aperti su [inPA](https://www.inpa.gov.it)
 - **Titoli di studio**: uno o più (es. diploma informatico + L-31 + L-9), anche cercandoli per nome; vedi solo i bandi a cui puoi accedere
 - **Prove**: solo scritto · scritto + orale · solo orale/colloquio · solo titoli · titoli + colloquio (+ esclusione preselettiva)
 - **Contratto**: tempo indeterminato · determinato (+ part-time)
+- **Avvisi per idonei in graduatorie di altri enti**: riconosciuti dal titolo e confrontati con le tue idoneità (es. Funzionario informatico), non con il titolo di studio
 - Regione, tipo di procedura, scadenza, ricerca libera (scrivendo una classe, es. `L-9`, vedi solo i bandi che la citano)
 - **Notifiche Telegram/email** dei bandi nuovi, con i filtri scelti dalla pagina
 
