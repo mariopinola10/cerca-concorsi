@@ -4,35 +4,33 @@
    "Campania"
   ],
   "prove": [
-   "non_rilevato",
    "solo_scritto",
-   "titoli"
-  ],
-  "contratto": [
-   "indeterminato",
    "non_rilevato"
   ],
+  "contratto": [],
   "titoli": [
+   "L-31",
    "DIP-INF",
    "DIP",
    "L-9",
-   "LM-22",
-   "L-31"
+   "LM-22"
   ],
   "idoneita": [
    "AINFC",
    "FINFL"
   ],
   "tipi": [],
-  "verificare": false,
+  "verificare": true,
   "nopres": false
  },
  "pausa": false,
- "offset": 689769970,
+ "offset": 689769971,
  "visti_extra": [
+  "56d87f5f26034515ade59c5ff3f1f5c1",
+  "043ad20ccf01464ebf61197cd10def61",
   "068a4ba9d6554bbe9ac71d5f3b822094",
   "cb06e02c72184265a03a8169c134e076"
  ],
  "bot": "PAconco_BOT",
- "aggiornato": "2026-11-12T07:25+00:00"
+ "aggiornato": "2026-11-12T07:38+00:00"
 }
